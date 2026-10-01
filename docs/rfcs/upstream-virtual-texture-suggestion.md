@@ -23,7 +23,7 @@ Would an example demonstrating virtual texture streaming be useful?
 I have a downstream prototype:
 
 - source: https://github.com/kvnloo/three.js/blob/rfc/virtual-texture-gigapixel/examples/webgpu_virtual_texture.html
-- commit-stable demo: https://rawcdn.githack.com/kvnloo/three.js/ccd584e8ef7f2506fddd5f1a2799bd0c210ba09d/examples/webgpu_virtual_texture.html
+- commit-stable demo: https://rawcdn.githack.com/kvnloo/three.js/a9ec415b5b8d706dd7ee20d8aaafd7f9320b4f59/examples/webgpu_virtual_texture.html
 - downstream design notes: https://github.com/kvnloo/three.js/blob/rfc/virtual-texture-gigapixel/docs/rfcs/virtual-texture-streaming.md
 
 The prototype intentionally changes **no core API**. It uses:
