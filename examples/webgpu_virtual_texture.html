@@ -201,34 +201,60 @@
 				const amplitudes = [ 0.18, 0.12, 0.08, 0.05, 0.03, 0.02 ];
 				const tau = Math.PI * 2;
 
+				const sinX = [];
+				const cosY = [];
+				const coefficients = [];
+
+				for ( let i = 0; i < frequencies.length; i ++ ) {
+
+					const frequency = frequencies[ i ];
+					const phase = i * 0.73;
+					const filter = sinc( Math.PI * frequency / levelSize );
+
+					coefficients[ i ] = amplitudes[ i ] * filter * filter;
+
+					const valuesX = new Float32Array( TILE_SIZE );
+					const valuesY = new Float32Array( TILE_SIZE );
+
+					for ( let x = 0; x < TILE_SIZE; x ++ ) {
+
+						const u = ( tileX * TILE_SIZE + x + 0.5 ) / levelSize;
+						valuesX[ x ] = Math.sin( tau * frequency * u + phase );
+
+					}
+
+					for ( let y = 0; y < TILE_SIZE; y ++ ) {
+
+						const v = ( tileY * TILE_SIZE + y + 0.5 ) / levelSize;
+						valuesY[ y ] = Math.cos( tau * frequency * v - phase );
+
+					}
+
+					sinX[ i ] = valuesX;
+					cosY[ i ] = valuesY;
+
+				}
+
 				let offset = 0;
 
 				for ( let y = 0; y < TILE_SIZE; y ++ ) {
 
-					const globalY = tileY * TILE_SIZE + y + 0.5;
-					const v = globalY / levelSize;
+					const v = ( tileY * TILE_SIZE + y + 0.5 ) / levelSize;
 
 					for ( let x = 0; x < TILE_SIZE; x ++ ) {
 
-						const globalX = tileX * TILE_SIZE + x + 0.5;
-						const u = globalX / levelSize;
-
+						const u = ( tileX * TILE_SIZE + x + 0.5 ) / levelSize;
 						let detail = 0;
 
 						for ( let i = 0; i < frequencies.length; i ++ ) {
 
-							const frequency = frequencies[ i ];
-							const filterX = sinc( Math.PI * frequency / levelSize );
-							const filterY = filterX;
-							const phase = i * 0.73;
-
-							detail += amplitudes[ i ] * filterX * filterY *
-								Math.sin( tau * frequency * u + phase ) *
-								Math.cos( tau * frequency * v - phase );
+							detail += coefficients[ i ] * sinX[ i ][ x ] * cosY[ i ][ y ];
 
 						}
 
-						const radial = Math.sin( tau * Math.hypot( u - 0.5, v - 0.5 ) * 12 ) * 0.04;
+						const dx = u - 0.5;
+						const dy = v - 0.5;
+						const radial = ( dx * dx + dy * dy - 0.18 ) * 0.08;
 
 						const r = clamp01( 0.12 + 0.68 * u + detail + radial );
 						const g = clamp01( 0.16 + 0.58 * v + detail * 0.65 - radial );
