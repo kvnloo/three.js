@@ -157,7 +157,10 @@
 				const plane = new THREE.Mesh( new THREE.PlaneGeometry( 2, 2 ), material );
 				scene.add( plane );
 
-				renderer = new THREE.WebGPURenderer( { antialias: true } );
+				renderer = new THREE.WebGPURenderer( {
+					antialias: true,
+					forceWebGL: new URLSearchParams( window.location.search ).has( 'forceWebGL' )
+				} );
 				renderer.setPixelRatio( window.devicePixelRatio );
 				renderer.setSize( window.innerWidth, window.innerHeight );
 				document.body.appendChild( renderer.domElement );

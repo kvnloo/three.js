@@ -53,6 +53,13 @@ function summarizeFrameTimes( frameTimesMs ) {
 
 function _rendererBackend( renderer ) {
 
+	if ( renderer && renderer.backend ) {
+
+		if ( renderer.backend.isWebGPUBackend === true ) return 'webgpu';
+		if ( renderer.backend.isWebGLBackend === true ) return 'webgl';
+
+	}
+
 	if ( renderer && renderer.isWebGPURenderer === true ) return 'webgpu';
 	if ( renderer && renderer.isWebGLRenderer === true ) return 'webgl';
 	return 'unknown';

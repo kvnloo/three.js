@@ -1,4 +1,5 @@
 import { PerspectiveCamera } from 'three';
+import { WebGPURenderer } from 'three/webgpu';
 import {
 	createReconstructionReceipt,
 	summarizeFrameTimes
@@ -76,6 +77,22 @@ export default QUnit.module( 'Addons', () => {
 
 				camera.position.set( 9, 9, 9 );
 				assert.deepEqual( receipt.camera.position, [ 1, 2, 3 ], 'receipt snapshots camera state' );
+
+			} );
+
+			QUnit.test( 'createReconstructionReceipt records the active WebGL fallback backend', ( assert ) => {
+
+				const renderer = new WebGPURenderer( { forceWebGL: true } );
+				const receipt = createReconstructionReceipt( {
+					renderer,
+					camera: new PerspectiveCamera(),
+					threeRevision: 'three',
+					sceneRevision: 'scene'
+				} );
+
+				assert.true( renderer.isWebGPURenderer, 'fallback retains the WebGPURenderer type flag' );
+				assert.true( renderer.backend.isWebGLBackend, 'constructor selects the supported WebGL backend' );
+				assert.equal( receipt.renderer.backend, 'webgl', 'receipt reports the active backend, not the renderer class' );
 
 			} );
 
