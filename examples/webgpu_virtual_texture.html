@@ -42,6 +42,7 @@
 			import { ivec2, texture, textureLoad, uniform, uv } from 'three/tsl';
 
 			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+			import { createReconstructionReceipt } from 'three/addons/utils/ReconstructionEvaluation.js';
 
 			const LOGICAL_SIZE = 65536;
 			const TILE_SIZE = 256;
@@ -54,6 +55,10 @@
 
 			const PAGE_TABLE_SIZE = 1 << MAX_LEVEL;
 			const ATLAS_BYTES = ATLAS_SIZE * ATLAS_SIZE * 4;
+			const PAGE_TABLE_BYTES = PAGE_TABLE_SIZE * PAGE_TABLE_SIZE * 4;
+			const FALLBACK_BYTES = TILE_SIZE * TILE_SIZE * 4;
+			const PERSISTENT_TEXTURE_BYTES = ATLAS_BYTES + PAGE_TABLE_BYTES + FALLBACK_BYTES;
+			const MAX_FRAME_SAMPLES = 600;
 
 			const HALF_TEXEL = 0.5 / TILE_SIZE;
 
@@ -82,6 +87,8 @@
 			let activeLevel = - 1;
 			let frame = 0;
 			let pageTableDirty = false;
+			let lastFrameTime = null;
+			const frameTimesMs = [];
 
 			const retiredTextures = [];
 
@@ -90,7 +97,8 @@
 				uploads: 0,
 				evictions: 0,
 				cacheHits: 0,
-				staleDrops: 0
+				staleDrops: 0,
+				uploadSubmitMs: 0
 			};
 
 			init();
@@ -149,7 +157,10 @@
 				const plane = new THREE.Mesh( new THREE.PlaneGeometry( 2, 2 ), material );
 				scene.add( plane );
 
-				renderer = new THREE.WebGPURenderer( { antialias: true } );
+				renderer = new THREE.WebGPURenderer( {
+					antialias: true,
+					forceWebGL: new URLSearchParams( window.location.search ).has( 'forceWebGL' )
+				} );
 				renderer.setPixelRatio( window.devicePixelRatio );
 				renderer.setSize( window.innerWidth, window.innerHeight );
 				document.body.appendChild( renderer.domElement );
@@ -173,6 +184,7 @@
 
 				updateDemand();
 
+				window.__threeVirtualTextureReceipt = createVirtualTextureReceipt;
 				renderer.setAnimationLoop( animate );
 
 			}
@@ -285,8 +297,25 @@
 
 			}
 
-			function animate() {
+			function animate( time ) {
 
+				const now = typeof time === 'number' ? time : performance.now();
+
+				if ( lastFrameTime !== null ) {
+
+					const elapsed = now - lastFrameTime;
+
+					if ( Number.isFinite( elapsed ) && elapsed >= 0 ) {
+
+						frameTimesMs.push( elapsed );
+
+						if ( frameTimesMs.length > MAX_FRAME_SAMPLES ) frameTimesMs.shift();
+
+					}
+
+				}
+
+				lastFrameTime = now;
 				frame ++;
 
 				controls.update();
@@ -516,7 +545,10 @@
 					const slotY = Math.floor( slotIndex / ATLAS_GRID );
 
 					dstPosition.set( slotX * TILE_SIZE, slotY * TILE_SIZE );
+
+					const uploadStart = performance.now();
 					renderer.copyTextureToTexture( tileTexture, atlasTexture, null, dstPosition );
+					counters.uploadSubmitMs += performance.now() - uploadStart;
 
 					const slot = slots[ slotIndex ];
 					slot.key = item.key;
@@ -633,6 +665,44 @@
 			function tileKey( level, x, y ) {
 
 				return `${ level }/${ x }/${ y }`;
+
+			}
+
+
+			function createVirtualTextureReceipt( options = {} ) {
+
+				const receipt = createReconstructionReceipt( {
+					renderer,
+					camera,
+					threeRevision: options.threeRevision || THREE.REVISION,
+					sceneRevision: options.sceneRevision || 'webgpu_virtual_texture-v0',
+					frameTimesMs,
+					uploadCount: counters.uploads,
+					uploadTimeMs: counters.uploadSubmitMs,
+					residentBytes: PERSISTENT_TEXTURE_BYTES,
+					virtualTexture: true,
+					screenshotSha256: options.screenshotSha256 || null
+				} );
+
+				receipt.virtualTextureCounters = {
+					requests: counters.requests,
+					uploads: counters.uploads,
+					evictions: counters.evictions,
+					cacheHits: counters.cacheHits,
+					staleDrops: counters.staleDrops,
+					pending: pending.size,
+					activeLoads,
+					visibleDemand: currentDemand.size,
+					residentPages: resident.size,
+					maxResidentPages: MAX_RESIDENT_PAGES
+				};
+				receipt.measurementNotes = {
+					uploadTime: 'CPU time around copyTextureToTexture submission; not GPU completion time.',
+					residentBytes: 'Persistent atlas + page table + fallback allocation; transient upload textures excluded.',
+					frameWindow: `latest ${ MAX_FRAME_SAMPLES } animation-loop intervals`
+				};
+
+				return receipt;
 
 			}
 
