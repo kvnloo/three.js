@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgpu - virtual texture</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<meta property="og:title" content="three.js webgpu - virtual texture">
+		<meta property="og:type" content="website">
+		<meta property="og:url" content="https://threejs.org/examples/webgpu_virtual_texture.html">
+		<meta property="og:image" content="https://threejs.org/examples/screenshots/webgpu_virtual_texture.jpg">
+		<link type="text/css" rel="stylesheet" href="example.css">
+	</head>
+	<body>
+
+		<div id="info">
+			<a href="https://threejs.org/" target="_blank" rel="noopener" class="logo-link"></a>
+
+			<div class="title-wrapper">
+				<a href="https://threejs.org/" target="_blank" rel="noopener">three.js</a><span>Virtual Texture</span>
+			</div>
+
+			<small>
+				4.3 gigapixel logical texture in a fixed 2048² atlas. Drag to pan, wheel to zoom.<br>
+				<span id="metrics"></span>
+			</small>
+		</div>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "../build/three.webgpu.js",
+					"three/webgpu": "../build/three.webgpu.js",
+					"three/tsl": "../build/three.tsl.js",
+					"three/addons/": "./jsm/"
+				}
+			}
+		</script>
+
+		<script type="module">
+
+			import * as THREE from 'three/webgpu';
+			import { ivec2, texture, textureLoad, uniform, uv } from 'three/tsl';
+
+			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+			const LOGICAL_SIZE = 65536;
+			const TILE_SIZE = 256;
+			const MAX_LEVEL = Math.log2( LOGICAL_SIZE / TILE_SIZE );
+
+			const ATLAS_GRID = 8;
+			const ATLAS_SIZE = TILE_SIZE * ATLAS_GRID;
+			const MAX_RESIDENT_PAGES = ATLAS_GRID * ATLAS_GRID;
+			const MAX_DEMAND_PAGES = 48;
+
+			const PAGE_TABLE_SIZE = 1 << MAX_LEVEL;
+			const ATLAS_BYTES = ATLAS_SIZE * ATLAS_SIZE * 4;
+
+			const HALF_TEXEL = 0.5 / TILE_SIZE;
+
+			let camera, scene, renderer, controls;
+			let atlasTexture, pageTableTexture, fallbackTexture;
+			let levelTilesUniform;
+
+			const metricsElement = document.getElementById( 'metrics' );
+			const drawingBufferSize = new THREE.Vector2();
+			const dstPosition = new THREE.Vector2();
+
+			const pageTableData = new Uint8Array( PAGE_TABLE_SIZE * PAGE_TABLE_SIZE * 4 );
+			const resident = new Map();
+			const slots = Array.from( { length: MAX_RESIDENT_PAGES }, () => ( {
+				key: null,
+				level: - 1,
+				x: - 1,
+				y: - 1,
+				lastUsed: - 1
+			} ) );
+
+			let currentDemand = new Set();
+			let requestQueue = [];
+			const pending = new Set();
+			let activeLoads = 0;
+			let activeLevel = - 1;
+			let frame = 0;
+			let pageTableDirty = false;
+
+			const retiredTextures = [];
+
+			const counters = {
+				requests: 0,
+				uploads: 0,
+				evictions: 0,
+				cacheHits: 0,
+				staleDrops: 0
+			};
+
+			init();
+
+			async function init() {
+
+				const aspect = window.innerWidth / window.innerHeight;
+
+				camera = new THREE.OrthographicCamera( - aspect, aspect, 1, - 1, 0.1, 10 );
+				camera.position.set( 0, 0, 2 );
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0x111318 );
+
+				atlasTexture = createTexture(
+					new Uint8Array( ATLAS_BYTES ),
+					ATLAS_SIZE,
+					ATLAS_SIZE,
+					THREE.LinearFilter,
+					THREE.SRGBColorSpace
+				);
+
+				pageTableTexture = createTexture(
+					pageTableData,
+					PAGE_TABLE_SIZE,
+					PAGE_TABLE_SIZE,
+					THREE.NearestFilter,
+					THREE.NoColorSpace
+				);
+
+				fallbackTexture = createTexture(
+					createTileData( 0, 0, 0 ),
+					TILE_SIZE,
+					TILE_SIZE,
+					THREE.LinearFilter,
+					THREE.SRGBColorSpace
+				);
+
+				levelTilesUniform = uniform( 1 );
+
+				const sourceUV = uv().clamp( 0.0, 0.999999 );
+				const virtualUV = sourceUV.mul( levelTilesUniform );
+				const tileCoord = ivec2( virtualUV.floor() );
+				const page = textureLoad( pageTableTexture, tileCoord );
+
+				const slot = page.rg.mul( ATLAS_GRID - 1 ).round();
+				const localUV = virtualUV.fract().clamp( HALF_TEXEL, 1.0 - HALF_TEXEL );
+				const atlasUV = slot.add( localUV ).div( ATLAS_GRID );
+
+				const fallbackColor = texture( fallbackTexture, sourceUV );
+				const detailColor = texture( atlasTexture, atlasUV );
+
+				const material = new THREE.MeshBasicNodeMaterial();
+				material.colorNode = page.b.greaterThan( 0.5 ).select( detailColor, fallbackColor );
+
+				const plane = new THREE.Mesh( new THREE.PlaneGeometry( 2, 2 ), material );
+				scene.add( plane );
+
+				renderer = new THREE.WebGPURenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				document.body.appendChild( renderer.domElement );
+
+				await renderer.init();
+
+				renderer.initTexture( atlasTexture );
+				renderer.initTexture( pageTableTexture );
+				renderer.initTexture( fallbackTexture );
+
+				controls = new OrbitControls( camera, renderer.domElement );
+				controls.enableRotate = false;
+				controls.enableDamping = true;
+				controls.dampingFactor = 0.12;
+				controls.screenSpacePanning = true;
+				controls.zoomToCursor = true;
+				controls.minZoom = 1;
+				controls.maxZoom = 128;
+
+				window.addEventListener( 'resize', onWindowResize );
+
+				updateDemand();
+
+				renderer.setAnimationLoop( animate );
+
+			}
+
+			function createTexture( data, width, height, filter, colorSpace ) {
+
+				const result = new THREE.DataTexture( data, width, height, THREE.RGBAFormat, THREE.UnsignedByteType );
+
+				result.colorSpace = colorSpace;
+				result.magFilter = filter;
+				result.minFilter = filter;
+				result.generateMipmaps = false;
+				result.wrapS = THREE.ClampToEdgeWrapping;
+				result.wrapT = THREE.ClampToEdgeWrapping;
+				result.needsUpdate = true;
+
+				return result;
+
+			}
+
+			function createTileData( level, tileX, tileY ) {
+
+				const data = new Uint8Array( TILE_SIZE * TILE_SIZE * 4 );
+				const levelSize = TILE_SIZE * ( 1 << level );
+				const frequencies = [ 1, 4, 16, 64, 256, 1024 ];
+				const amplitudes = [ 0.18, 0.12, 0.08, 0.05, 0.03, 0.02 ];
+				const tau = Math.PI * 2;
+
+				const sinX = [];
+				const cosY = [];
+				const coefficients = [];
+
+				for ( let i = 0; i < frequencies.length; i ++ ) {
+
+					const frequency = frequencies[ i ];
+					const phase = i * 0.73;
+					const filter = sinc( Math.PI * frequency / levelSize );
+
+					coefficients[ i ] = amplitudes[ i ] * filter * filter;
+
+					const valuesX = new Float32Array( TILE_SIZE );
+					const valuesY = new Float32Array( TILE_SIZE );
+
+					for ( let x = 0; x < TILE_SIZE; x ++ ) {
+
+						const u = ( tileX * TILE_SIZE + x + 0.5 ) / levelSize;
+						valuesX[ x ] = Math.sin( tau * frequency * u + phase );
+
+					}
+
+					for ( let y = 0; y < TILE_SIZE; y ++ ) {
+
+						const v = ( tileY * TILE_SIZE + y + 0.5 ) / levelSize;
+						valuesY[ y ] = Math.cos( tau * frequency * v - phase );
+
+					}
+
+					sinX[ i ] = valuesX;
+					cosY[ i ] = valuesY;
+
+				}
+
+				let offset = 0;
+
+				for ( let y = 0; y < TILE_SIZE; y ++ ) {
+
+					const v = ( tileY * TILE_SIZE + y + 0.5 ) / levelSize;
+
+					for ( let x = 0; x < TILE_SIZE; x ++ ) {
+
+						const u = ( tileX * TILE_SIZE + x + 0.5 ) / levelSize;
+						let detail = 0;
+
+						for ( let i = 0; i < frequencies.length; i ++ ) {
+
+							detail += coefficients[ i ] * sinX[ i ][ x ] * cosY[ i ][ y ];
+
+						}
+
+						const dx = u - 0.5;
+						const dy = v - 0.5;
+						const radial = ( dx * dx + dy * dy - 0.18 ) * 0.08;
+
+						const r = clamp01( 0.12 + 0.68 * u + detail + radial );
+						const g = clamp01( 0.16 + 0.58 * v + detail * 0.65 - radial );
+						const b = clamp01( 0.34 + 0.18 * ( 1 - u ) + 0.20 * ( 1 - v ) - detail * 0.45 );
+
+						data[ offset ++ ] = Math.round( r * 255 );
+						data[ offset ++ ] = Math.round( g * 255 );
+						data[ offset ++ ] = Math.round( b * 255 );
+						data[ offset ++ ] = 255;
+
+					}
+
+				}
+
+				return data;
+
+			}
+
+			function sinc( value ) {
+
+				return Math.abs( value ) < 1e-8 ? 1 : Math.sin( value ) / value;
+
+			}
+
+			function clamp01( value ) {
+
+				return Math.max( 0, Math.min( 1, value ) );
+
+			}
+
+			function animate() {
+
+				frame ++;
+
+				controls.update();
+				updateDemand();
+				pumpQueue();
+
+				if ( pageTableDirty ) {
+
+					pageTableTexture.needsUpdate = true;
+					pageTableDirty = false;
+
+				}
+
+				while ( retiredTextures.length > 0 && retiredTextures[ 0 ].frame + 2 < frame ) {
+
+					retiredTextures.shift().texture.dispose();
+
+				}
+
+				updateMetrics();
+				renderer.render( scene, camera );
+
+			}
+
+			function updateDemand() {
+
+				renderer.getDrawingBufferSize( drawingBufferSize );
+
+				const centerX = controls.target.x;
+				const centerY = controls.target.y;
+
+				const frustumWidth = ( camera.right - camera.left ) / camera.zoom;
+				const frustumHeight = ( camera.top - camera.bottom ) / camera.zoom;
+
+				const minU = THREE.MathUtils.clamp( ( centerX - frustumWidth * 0.5 + 1 ) * 0.5, 0, 1 );
+				const maxU = THREE.MathUtils.clamp( ( centerX + frustumWidth * 0.5 + 1 ) * 0.5, 0, 1 );
+				const minV = THREE.MathUtils.clamp( ( centerY - frustumHeight * 0.5 + 1 ) * 0.5, 0, 1 );
+				const maxV = THREE.MathUtils.clamp( ( centerY + frustumHeight * 0.5 + 1 ) * 0.5, 0, 1 );
+
+				if ( minU >= maxU || minV >= maxV ) {
+
+					currentDemand = new Set();
+					requestQueue.length = 0;
+					return;
+
+				}
+
+				const sourcePixelsAcross = Math.max(
+					drawingBufferSize.x * 2 / frustumWidth,
+					drawingBufferSize.y * 2 / frustumHeight
+				);
+
+				let level = THREE.MathUtils.clamp(
+					Math.ceil( Math.log2( sourcePixelsAcross / TILE_SIZE ) ),
+					0,
+					MAX_LEVEL
+				);
+
+				let range = getTileRange( level, minU, maxU, minV, maxV );
+
+				while ( range.count > MAX_DEMAND_PAGES && level > 0 ) {
+
+					level --;
+					range = getTileRange( level, minU, maxU, minV, maxV );
+
+				}
+
+				if ( level !== activeLevel ) {
+
+					activeLevel = level;
+					levelTilesUniform.value = 1 << activeLevel;
+					rebuildPageTable();
+
+				}
+
+				const centerTileX = ( minU + maxU ) * 0.5 * ( 1 << level );
+				const centerTileY = ( minV + maxV ) * 0.5 * ( 1 << level );
+
+				const wanted = [];
+
+				for ( let y = range.minY; y <= range.maxY; y ++ ) {
+
+					for ( let x = range.minX; x <= range.maxX; x ++ ) {
+
+						const key = tileKey( level, x, y );
+						const dx = x + 0.5 - centerTileX;
+						const dy = y + 0.5 - centerTileY;
+
+						wanted.push( { key, level, x, y, priority: dx * dx + dy * dy } );
+
+					}
+
+				}
+
+				wanted.sort( ( a, b ) => a.priority - b.priority );
+
+				currentDemand = new Set( wanted.map( item => item.key ) );
+				requestQueue = [];
+
+				for ( const item of wanted ) {
+
+					const slotIndex = resident.get( item.key );
+
+					if ( slotIndex !== undefined ) {
+
+						slots[ slotIndex ].lastUsed = frame;
+						counters.cacheHits ++;
+
+					} else if ( pending.has( item.key ) === false ) {
+
+						requestQueue.push( item );
+
+					}
+
+				}
+
+			}
+
+			function getTileRange( level, minU, maxU, minV, maxV ) {
+
+				const tiles = 1 << level;
+				const overscan = 1;
+
+				const minX = THREE.MathUtils.clamp( Math.floor( minU * tiles ) - overscan, 0, tiles - 1 );
+				const maxX = THREE.MathUtils.clamp( Math.ceil( maxU * tiles ) - 1 + overscan, 0, tiles - 1 );
+				const minY = THREE.MathUtils.clamp( Math.floor( minV * tiles ) - overscan, 0, tiles - 1 );
+				const maxY = THREE.MathUtils.clamp( Math.ceil( maxV * tiles ) - 1 + overscan, 0, tiles - 1 );
+
+				return {
+					minX,
+					maxX,
+					minY,
+					maxY,
+					count: ( maxX - minX + 1 ) * ( maxY - minY + 1 )
+				};
+
+			}
+
+			function rebuildPageTable() {
+
+				pageTableData.fill( 0 );
+
+				for ( let slotIndex = 0; slotIndex < slots.length; slotIndex ++ ) {
+
+					const slot = slots[ slotIndex ];
+
+					if ( slot.level === activeLevel ) {
+
+						writePageTableEntry( slot.x, slot.y, slotIndex, true );
+
+					}
+
+				}
+
+				pageTableDirty = true;
+
+			}
+
+			function writePageTableEntry( x, y, slotIndex, valid ) {
+
+				const offset = ( y * PAGE_TABLE_SIZE + x ) * 4;
+
+				if ( valid ) {
+
+					const slotX = slotIndex % ATLAS_GRID;
+					const slotY = Math.floor( slotIndex / ATLAS_GRID );
+
+					pageTableData[ offset ] = Math.round( slotX * 255 / ( ATLAS_GRID - 1 ) );
+					pageTableData[ offset + 1 ] = Math.round( slotY * 255 / ( ATLAS_GRID - 1 ) );
+					pageTableData[ offset + 2 ] = 255;
+					pageTableData[ offset + 3 ] = 255;
+
+				} else {
+
+					pageTableData[ offset + 2 ] = 0;
+
+				}
+
+				pageTableDirty = true;
+
+			}
+
+			function pumpQueue() {
+
+				while ( activeLoads < 2 && requestQueue.length > 0 ) {
+
+					const item = requestQueue.shift();
+
+					if ( currentDemand.has( item.key ) === false || resident.has( item.key ) || pending.has( item.key ) ) continue;
+
+					loadPage( item );
+
+				}
+
+			}
+
+			async function loadPage( item ) {
+
+				activeLoads ++;
+				pending.add( item.key );
+				counters.requests ++;
+
+				try {
+
+					await idle();
+
+					const tileTexture = createTexture(
+						createTileData( item.level, item.x, item.y ),
+						TILE_SIZE,
+						TILE_SIZE,
+						THREE.LinearFilter,
+						THREE.SRGBColorSpace
+					);
+
+					if ( currentDemand.has( item.key ) === false ) {
+
+						tileTexture.dispose();
+						counters.staleDrops ++;
+						return;
+
+					}
+
+					renderer.initTexture( tileTexture );
+
+					const slotIndex = acquireSlot( item );
+					const slotX = slotIndex % ATLAS_GRID;
+					const slotY = Math.floor( slotIndex / ATLAS_GRID );
+
+					dstPosition.set( slotX * TILE_SIZE, slotY * TILE_SIZE );
+					renderer.copyTextureToTexture( tileTexture, atlasTexture, null, dstPosition );
+
+					const slot = slots[ slotIndex ];
+					slot.key = item.key;
+					slot.level = item.level;
+					slot.x = item.x;
+					slot.y = item.y;
+					slot.lastUsed = frame;
+
+					resident.set( item.key, slotIndex );
+
+					if ( item.level === activeLevel ) {
+
+						writePageTableEntry( item.x, item.y, slotIndex, true );
+
+					}
+
+					retiredTextures.push( { texture: tileTexture, frame } );
+					counters.uploads ++;
+
+				} finally {
+
+					pending.delete( item.key );
+					activeLoads --;
+
+				}
+
+			}
+
+			function acquireSlot( incoming ) {
+
+				for ( let i = 0; i < slots.length; i ++ ) {
+
+					if ( slots[ i ].key === null ) return i;
+
+				}
+
+				let candidate = - 1;
+				let oldestFrame = Infinity;
+
+				for ( let i = 0; i < slots.length; i ++ ) {
+
+					const slot = slots[ i ];
+
+					if ( currentDemand.has( slot.key ) ) continue;
+
+					if ( slot.lastUsed < oldestFrame ) {
+
+						oldestFrame = slot.lastUsed;
+						candidate = i;
+
+					}
+
+				}
+
+				if ( candidate === - 1 ) {
+
+					for ( let i = 0; i < slots.length; i ++ ) {
+
+						if ( slots[ i ].lastUsed < oldestFrame ) {
+
+							oldestFrame = slots[ i ].lastUsed;
+							candidate = i;
+
+						}
+
+					}
+
+				}
+
+				const evicted = slots[ candidate ];
+
+				if ( evicted.key !== null ) {
+
+					resident.delete( evicted.key );
+
+					if ( evicted.level === activeLevel ) {
+
+						writePageTableEntry( evicted.x, evicted.y, candidate, false );
+
+					}
+
+					counters.evictions ++;
+
+				}
+
+				evicted.key = incoming.key;
+				evicted.level = incoming.level;
+				evicted.x = incoming.x;
+				evicted.y = incoming.y;
+				evicted.lastUsed = frame;
+
+				return candidate;
+
+			}
+
+			function idle() {
+
+				return new Promise( resolve => {
+
+					if ( 'requestIdleCallback' in window ) {
+
+						window.requestIdleCallback( resolve, { timeout: 32 } );
+
+					} else {
+
+						setTimeout( resolve, 0 );
+
+					}
+
+				} );
+
+			}
+
+			function tileKey( level, x, y ) {
+
+				return `${ level }/${ x }/${ y }`;
+
+			}
+
+			function updateMetrics() {
+
+				let visibleReady = 0;
+
+				for ( const key of currentDemand ) {
+
+					if ( resident.has( key ) ) visibleReady ++;
+
+				}
+
+				metricsElement.textContent =
+					`LOD ${ activeLevel }/${ MAX_LEVEL } · ` +
+					`${ visibleReady }/${ currentDemand.size } visible pages · ` +
+					`${ resident.size }/${ MAX_RESIDENT_PAGES } resident · ` +
+					`${ ( ATLAS_BYTES / 1024 / 1024 ).toFixed( 0 ) } MiB atlas · ` +
+					`${ counters.uploads } uploads · ` +
+					`${ counters.evictions } evictions · ` +
+					`${ counters.staleDrops } stale drops`;
+
+			}
+
+			function onWindowResize() {
+
+				const aspect = window.innerWidth / window.innerHeight;
+
+				camera.left = - aspect;
+				camera.right = aspect;
+				camera.top = 1;
+				camera.bottom = - 1;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+		</script>
+	</body>
+</html>
