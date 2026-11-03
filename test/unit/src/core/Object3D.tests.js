@@ -1204,6 +1204,35 @@ export default QUnit.module( 'Core', () => {
 
 		} );
 
+		QUnit.test( 'clone (circular userData)', ( assert ) => {
+
+			const object = new Object3D();
+			const parent = new Object3D();
+
+			object.userData.parent = parent;
+			object.userData.circular = object.userData;
+
+			const cloned = object.clone( false );
+
+			assert.notStrictEqual( cloned.userData, object.userData, 'userData container is copied' );
+			assert.strictEqual( cloned.userData.parent, parent, 'Object3D reference is preserved' );
+			assert.strictEqual( cloned.userData.circular, object.userData, 'non-serializable nested reference is preserved' );
+
+		} );
+
+		QUnit.test( 'clone (serializable userData)', ( assert ) => {
+
+			const object = new Object3D();
+			object.userData.settings = { value: 1 };
+
+			const cloned = object.clone( false );
+
+			assert.notStrictEqual( cloned.userData, object.userData, 'userData container is copied' );
+			assert.notStrictEqual( cloned.userData.settings, object.userData.settings, 'serializable nested data is deep-copied' );
+			assert.deepEqual( cloned.userData.settings, { value: 1 }, 'nested values are preserved' );
+
+		} );
+
 		QUnit.test( 'copy', ( assert ) => {
 
 			const a = new Object3D();
