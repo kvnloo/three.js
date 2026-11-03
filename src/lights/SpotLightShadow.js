@@ -42,6 +42,15 @@ class SpotLightShadow extends LightShadow {
 		 */
 		this.aspect = 1;
 
+		/**
+		 * The maximum distance of the shadow camera when the spot light has unlimited range
+		 * (`SpotLight.distance` is `0`). Otherwise the light's distance defines the limit.
+		 *
+		 * @type {number}
+		 * @default 500
+		 */
+		this.shadowLimit = 500;
+
 	}
 
 	updateMatrices( light ) {
@@ -50,7 +59,7 @@ class SpotLightShadow extends LightShadow {
 
 		const fov = RAD2DEG * 2 * light.angle * this.focus;
 		const aspect = ( this.mapSize.width / this.mapSize.height ) * this.aspect;
-		const far = light.distance || camera.far;
+		const far = light.distance || this.shadowLimit;
 
 		if ( fov !== camera.fov || aspect !== camera.aspect || far !== camera.far ) {
 
@@ -71,6 +80,7 @@ class SpotLightShadow extends LightShadow {
 
 		this.focus = source.focus;
 		this.aspect = source.aspect;
+		this.shadowLimit = source.shadowLimit;
 
 		return this;
 
@@ -88,6 +98,7 @@ class SpotLightShadow extends LightShadow {
 
 		object.focus = this.focus;
 		object.aspect = this.aspect;
+		object.shadowLimit = this.shadowLimit;
 
 		return object;
 
