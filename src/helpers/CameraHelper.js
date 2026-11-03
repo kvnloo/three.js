@@ -309,6 +309,23 @@ class CameraHelper extends LineSegments {
 	}
 
 	/**
+	 * Returns a clone of this helper that references the same camera.
+	 *
+	 * @param {boolean} [recursive=true] - Whether to clone descendants.
+	 * @return {CameraHelper} The cloned helper.
+	 */
+	clone( recursive ) {
+
+		const helper = new this.constructor( this.camera );
+		helper.copy( this, recursive );
+		helper.geometry = this.geometry.clone();
+		helper.material = this.material.clone();
+
+		return helper;
+
+	}
+
+	/**
 	 * Frees the GPU-related resources allocated by this instance. Call this
 	 * method whenever this instance is no longer used in your app.
 	 */
