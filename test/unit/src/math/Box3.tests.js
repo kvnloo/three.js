@@ -7,6 +7,8 @@ import { Matrix4 } from '../../../../src/math/Matrix4.js';
 import { Mesh } from '../../../../src/objects/Mesh.js';
 import { BatchedMesh } from '../../../../src/objects/BatchedMesh.js';
 import { BufferAttribute } from '../../../../src/core/BufferAttribute.js';
+import { BufferGeometry } from '../../../../src/core/BufferGeometry.js';
+import { Points } from '../../../../src/objects/Points.js';
 import { BoxGeometry } from '../../../../src/geometries/BoxGeometry.js';
 import {
 	SphereGeometry,
@@ -164,6 +166,57 @@ export default QUnit.module( 'Maths', () => {
 			a.setFromObject( object );
 			assert.ok( a.min.equals( new Vector3( - 1, - 1, - 1 ) ), 'Correct new minimum' );
 			assert.ok( a.max.equals( new Vector3( 1, 1, 1 ) ), 'Correct new maximum' );
+
+		} );
+
+		QUnit.test( 'setFromObject/DrawRange', ( assert ) => {
+
+			const geometry = new BufferGeometry();
+			geometry.setAttribute( 'position', new BufferAttribute( new Float32Array( [
+				- 10, - 10, - 10,
+				1, 2, 3,
+				4, 5, 6,
+				20, 20, 20
+			] ), 3 ) );
+
+			const points = new Points( geometry );
+			const box = new Box3();
+
+			geometry.computeBoundingBox();
+			geometry.setDrawRange( 1, 2 );
+			box.setFromObject( points );
+			assert.ok( box.min.equals( new Vector3( 1, 2, 3 ) ), 'Non-indexed range minimum' );
+			assert.ok( box.max.equals( new Vector3( 4, 5, 6 ) ), 'Non-indexed range maximum' );
+
+			box.setFromObject( points, true );
+			assert.ok( box.min.equals( new Vector3( 1, 2, 3 ) ), 'Precise range minimum' );
+			assert.ok( box.max.equals( new Vector3( 4, 5, 6 ) ), 'Precise range maximum' );
+
+			points.position.set( 10, 0, 0 );
+			box.setFromObject( points );
+			assert.ok( box.min.equals( new Vector3( 11, 2, 3 ) ), 'Range minimum with world transform' );
+			assert.ok( box.max.equals( new Vector3( 14, 5, 6 ) ), 'Range maximum with world transform' );
+
+			geometry.setIndex( [ 0, 3, 1, 2 ] );
+			geometry.setDrawRange( 1, 3 );
+			const mesh = new Mesh( geometry );
+
+			box.setFromObject( mesh );
+			assert.ok( box.min.equals( new Vector3( 1, 2, 3 ) ), 'Indexed range minimum' );
+			assert.ok( box.max.equals( new Vector3( 20, 20, 20 ) ), 'Indexed range maximum' );
+
+			box.setFromObject( mesh, true );
+			assert.ok( box.min.equals( new Vector3( 1, 2, 3 ) ), 'Precise indexed range minimum' );
+			assert.ok( box.max.equals( new Vector3( 20, 20, 20 ) ), 'Precise indexed range maximum' );
+
+			geometry.setDrawRange( 2, 0 );
+			box.setFromObject( mesh );
+			assert.ok( box.isEmpty(), 'Empty draw range remains empty' );
+
+			geometry.setDrawRange( 0, Infinity );
+			box.setFromObject( mesh );
+			assert.ok( box.min.equals( new Vector3( - 10, - 10, - 10 ) ), 'Unrestricted minimum unchanged' );
+			assert.ok( box.max.equals( new Vector3( 20, 20, 20 ) ), 'Unrestricted maximum unchanged' );
 
 		} );
 

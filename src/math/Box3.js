@@ -312,21 +312,30 @@ class Box3 {
 		if ( geometry !== undefined ) {
 
 			const positionAttribute = geometry.getAttribute( 'position' );
+			const drawRange = geometry.drawRange;
+			const hasDrawRange = drawRange.start !== 0 || drawRange.count !== Infinity;
 
 			// precise AABB computation based on vertex data requires at least a position attribute.
 			// instancing and batching aren't supported so far and use the normal (conservative) code path.
 
-			if ( precise === true && positionAttribute !== undefined && object.isInstancedMesh !== true && object.isBatchedMesh !== true ) {
+			if ( ( precise === true || hasDrawRange ) && positionAttribute !== undefined && object.isInstancedMesh !== true && object.isBatchedMesh !== true ) {
 
-				for ( let i = 0, l = positionAttribute.count; i < l; i ++ ) {
+				// Restricted draw ranges refer to indices when present, and vertices otherwise.
+				const index = geometry.index;
+				const start = hasDrawRange ? drawRange.start : 0;
+				const end = hasDrawRange ? Math.min( start + drawRange.count, index !== null ? index.count : positionAttribute.count ) : positionAttribute.count;
+
+				for ( let i = start; i < end; i ++ ) {
+
+					const vertexIndex = hasDrawRange && index !== null ? index.getX( i ) : i;
 
 					if ( object.isMesh === true ) {
 
-						object.getVertexPosition( i, _vector );
+						object.getVertexPosition( vertexIndex, _vector );
 
 					} else {
 
-						_vector.fromBufferAttribute( positionAttribute, i );
+						_vector.fromBufferAttribute( positionAttribute, vertexIndex );
 
 					}
 
