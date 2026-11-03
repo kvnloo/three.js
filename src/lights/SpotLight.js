@@ -18,7 +18,7 @@ import { Object3D } from '../core/Object3D.js';
  * spotLight.shadow.mapSize.width = 1024;
  * spotLight.shadow.mapSize.height = 1024;
  * spotLight.shadow.camera.near = 500;
- * spotLight.shadow.camera.far = 4000;
+ * spotLight.shadow.shadowLimit = 4000;
  * spotLight.shadow.camera.fov = 30;s
  * ```
  *
