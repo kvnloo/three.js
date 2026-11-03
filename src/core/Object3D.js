@@ -1646,7 +1646,16 @@ class Object3D extends EventDispatcher {
 
 		this.animations = source.animations.slice();
 
-		this.userData = JSON.parse( JSON.stringify( source.userData ) );
+		try {
+
+			this.userData = JSON.parse( JSON.stringify( source.userData ) );
+
+		} catch {
+
+			// Preserve non-serializable data by reference rather than failing to copy the object.
+			this.userData = Object.assign( {}, source.userData );
+
+		}
 
 		if ( recursive === true ) {
 
