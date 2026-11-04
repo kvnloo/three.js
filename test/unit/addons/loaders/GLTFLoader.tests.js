@@ -150,6 +150,54 @@ export default QUnit.module( 'Addons', () => {
 
 			} );
 
+			QUnit.test( 'keeps primitive extras distinct in cached geometries', async ( assert ) => {
+
+				const positions = new Float32Array( [
+					0, 0, 0,
+					1, 0, 0,
+					0, 1, 0
+				] );
+				const extrasA = { label: 'PrimA', meta: { index: 1 } };
+				const extrasB = { label: 'PrimB', meta: { index: 2 } };
+				const json = {
+					asset: { version: '2.0' },
+					scene: 0,
+					scenes: [ { nodes: [ 0, 1, 2, 3 ] } ],
+					nodes: [ { mesh: 0 }, { mesh: 1 }, { mesh: 2 }, { mesh: 3 } ],
+					meshes: [
+						{ primitives: [ { attributes: { POSITION: 0 }, extras: extrasA } ] },
+						{ primitives: [ { attributes: { POSITION: 0 }, extras: extrasB } ] },
+						{ primitives: [ { attributes: { POSITION: 0 }, extras: { label: 'PrimA', meta: { index: 1 } } } ] },
+						{ primitives: [ { attributes: { POSITION: 0 } } ] }
+					],
+					buffers: [ {
+						byteLength: positions.byteLength,
+						uri: 'data:application/octet-stream;base64,' + arrayBufferToBase64( positions.buffer )
+					} ],
+					bufferViews: [ { buffer: 0, byteLength: positions.byteLength } ],
+					accessors: [ {
+						bufferView: 0,
+						componentType: FLOAT,
+						count: 3,
+						type: 'VEC3',
+						min: [ 0, 0, 0 ],
+						max: [ 1, 1, 0 ]
+					} ]
+				};
+				const gltf = await new GLTFLoader().parseAsync( JSON.stringify( json ), '' );
+				const [ meshA, meshB, meshASame, meshWithoutExtras ] = gltf.scene.children;
+
+				assert.deepEqual( meshA.geometry.userData, extrasA, 'first primitive keeps its extras' );
+				assert.deepEqual( meshB.geometry.userData, extrasB, 'second primitive keeps different extras' );
+				assert.deepEqual( meshASame.geometry.userData, extrasA, 'equal extras remain intact' );
+				assert.deepEqual( meshWithoutExtras.geometry.userData, {}, 'primitive without extras stays empty' );
+				assert.notStrictEqual( meshA.geometry, meshB.geometry, 'different extras use different geometries' );
+				assert.strictEqual( meshA.geometry, meshASame.geometry, 'equal extras still share the cached geometry' );
+				assert.notStrictEqual( meshA.geometry, meshWithoutExtras.geometry, 'missing extras use a separate geometry' );
+				assert.strictEqual( new Set( gltf.scene.children.map( mesh => mesh.geometry ) ).size, 3, 'four primitives produce three geometries' );
+
+			} );
+
 			QUnit.test( 'CUBICSPLINE animations can be made additive at an interpolated frame', async ( assert ) => {
 
 				const buffer = new Float32Array( [

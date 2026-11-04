@@ -2591,6 +2591,13 @@ function createPrimitiveKey( primitiveDef ) {
 
 	}
 
+	// Primitive extras are stored on BufferGeometry, so geometries with different extras cannot be shared.
+	if ( primitiveDef.extras !== undefined ) {
+
+		geometryKey += ':extras:' + JSON.stringify( primitiveDef.extras );
+
+	}
+
 	return geometryKey;
 
 }
