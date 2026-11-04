@@ -2591,6 +2591,13 @@ function createPrimitiveKey( primitiveDef ) {
 
 	}
 
+	// Primitive extras are stored on BufferGeometry, so geometries with different extras cannot be shared.
+	if ( primitiveDef.extras !== undefined ) {
+
+		geometryKey += ':extras:' + JSON.stringify( primitiveDef.extras );
+
+	}
+
 	return geometryKey;
 
 }
@@ -3941,7 +3948,7 @@ class GLTFParser {
 	 *
 	 * @private
 	 * @param {number} meshIndex
-	 * @return {Promise<Group|Mesh|SkinnedMesh|Line|Points>}
+	 * @return {Promise<Group>}
 	 */
 	loadMesh( meshIndex ) {
 
@@ -4038,9 +4045,7 @@ class GLTFParser {
 
 				}
 
-				mesh.name = parser.createUniqueName( meshDef.name || ( 'mesh_' + meshIndex ) );
-
-				assignExtrasToUserData( mesh, meshDef );
+				mesh.name = parser.createUniqueName( ( meshDef.name || ( 'mesh_' + meshIndex ) ) + '_primitive_' + i );
 
 				if ( primitive.extensions ) addUnknownExtensionsToUserData( extensions, mesh, primitive );
 
@@ -4059,16 +4064,10 @@ class GLTFParser {
 
 			}
 
-			if ( meshes.length === 1 ) {
-
-				if ( meshDef.extensions ) addUnknownExtensionsToUserData( extensions, meshes[ 0 ], meshDef );
-
-				return meshes[ 0 ];
-
-			}
-
 			const group = new Group();
+			group.name = parser.createUniqueName( meshDef.name || ( 'mesh_' + meshIndex ) );
 
+			assignExtrasToUserData( group, meshDef );
 			if ( meshDef.extensions ) addUnknownExtensionsToUserData( extensions, group, meshDef );
 
 			parser.associations.set( group, { meshes: meshIndex } );
@@ -4483,6 +4482,11 @@ class GLTFParser {
 			} else if ( objects.length > 1 ) {
 
 				node = new Group();
+
+			} else if ( objects.length === 1 && nodeDef.mesh !== undefined && objects[ 0 ].isGroup ) {
+
+				// Keep the glTF node distinct from its mesh group.
+				node = new Object3D();
 
 			} else if ( objects.length === 1 ) {
 
