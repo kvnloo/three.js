@@ -4,6 +4,8 @@ import { Object3D } from '../../../../src/core/Object3D.js';
 import { BufferGeometry } from '../../../../src/core/BufferGeometry.js';
 import { Float32BufferAttribute } from '../../../../src/core/BufferAttribute.js';
 import { Material } from '../../../../src/materials/Material.js';
+import { Raycaster } from '../../../../src/core/Raycaster.js';
+import { Vector3 } from '../../../../src/math/Vector3.js';
 
 export default QUnit.module( 'Objects', () => {
 
@@ -82,6 +84,38 @@ export default QUnit.module( 'Objects', () => {
 			assert.notStrictEqual( copy.morphTargetInfluences, line.morphTargetInfluences, 'morphTargetInfluences are not shared' );
 			assert.deepEqual( copy.morphTargetDictionary, { target: 0 }, 'morphTargetDictionary is copied' );
 			assert.notStrictEqual( copy.morphTargetDictionary, line.morphTargetDictionary, 'morphTargetDictionary is not shared' );
+
+		} );
+
+		QUnit.test( 'raycast/parent scale uses world-space threshold', ( assert ) => {
+
+			// Reproduction for hlfkyo's mrdoob/three.js#29679.
+			// The ray is 0.75 world units from the line; the threshold is 0.5.
+			const geometry = new BufferGeometry();
+			geometry.setAttribute( 'position', new Float32BufferAttribute( [ - 1, 0, 0, 1, 0, 0 ], 3 ) );
+
+			const parent = new Object3D();
+			const line = new Line( geometry );
+			parent.add( line );
+
+			const raycaster = new Raycaster( new Vector3( 0, 0.75, 5 ), new Vector3( 0, 0, - 1 ) );
+			raycaster.params.Line.threshold = 0.5;
+
+			const cases = [
+				{ scale: [ 1, 1, 1 ], label: 'identity parent' },
+				{ scale: [ 2, 2, 2 ], label: 'uniformly scaled parent' },
+				{ scale: [ 1, 4, 1 ], label: 'nonuniformly scaled parent' }
+			];
+
+			for ( const { scale, label } of cases ) {
+
+				parent.scale.set( ...scale );
+				parent.updateMatrixWorld( true );
+
+				assert.strictEqual( raycaster.intersectObject( line, false ).length, 0,
+					label + ': world-space distance 0.75 exceeds threshold 0.5' );
+
+			}
 
 		} );
 
