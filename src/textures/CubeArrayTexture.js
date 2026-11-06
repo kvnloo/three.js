@@ -1,43 +1,49 @@
-import { Texture } from './Texture.js';
-import { CubeReflectionMapping } from '../constants.js';
+import { CubeTexture } from './CubeTexture.js';
 
 /**
- * Creates an array of cube textures. Each cube occupies six consecutive
- * layers, so `depth` must be a multiple of six. Sample a specific cube by
- * passing its index to `depth()` of a cube texture node.
+ * A WebGPU texture containing multiple cube maps.
  *
- * ```js
- * const renderTarget = new THREE.RenderTarget( size, size, { depth: cubeCount * 6, mapping: THREE.CubeReflectionMapping } );
- * renderTarget.texture = new THREE.CubeArrayTexture().copy( renderTarget.texture );
+ * For image-backed textures, provide an array of cubes, each containing six
+ * images ordered like CubeTexture (positive/negative X, Y, and Z). When the
+ * texture is copied from a layered render target, image.depth is instead the
+ * total face-layer count: six layers per cube.
  *
- * const color = cubeTexture( renderTarget.texture, direction ).depth( cubeIndex );
- * ```
+ * Use cubeTexture( texture, direction ).depth( cubeIndex ) to sample one cube.
+ * Cube arrays are only supported by WebGPURenderer with the WebGPU backend.
  *
- * Only supported by `WebGPURenderer` with a WebGPU backend.
- *
- * @augments Texture
+ * @augments CubeTexture
  */
-class CubeArrayTexture extends Texture {
+class CubeArrayTexture extends CubeTexture {
 
 	/**
-	 * Constructs a new cube array texture.
+	 * Constructs a cube array texture from an array of six-face image arrays.
 	 *
-	 * @param {number} [width=1] - The width of each cube face.
-	 * @param {number} [height=1] - The height of each cube face.
-	 * @param {number} [depth=6] - The number of layers (six per cube).
+	 * An empty array is also valid for an uninitialized or render-target texture.
+	 *
+	 * @param {Array<Array<Image>>} [images=[]] - One array of six face images per cube.
 	 */
-	constructor( width = 1, height = 1, depth = 6 ) {
+	constructor( images = [] ) {
 
-		super( { width, height, depth }, CubeReflectionMapping );
+		if ( ! Array.isArray( images ) || images.some( ( cube ) => ! Array.isArray( cube ) || cube.length !== 6 ) ) {
+
+			throw new TypeError( 'CubeArrayTexture: Expected an array of six-face image arrays.' );
+
+		}
+
+		super( images );
 
 		/**
-		 * This flag can be used for type testing.
+		 * Identifies this texture as a cube array.
 		 *
 		 * @type {boolean}
 		 * @readonly
 		 * @default true
 		 */
 		this.isCubeArrayTexture = true;
+
+		// Cube array textures are arrayed as well as cubical.
+		// Keeping both flags enables cube sampling and a default array index.
+		this.isArrayTexture = true;
 
 	}
 

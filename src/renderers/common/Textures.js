@@ -539,6 +539,12 @@ class Textures extends DataMap {
 
 		let image = texture.images ? texture.images[ 0 ] : texture.image;
 
+		if ( texture.isCubeArrayTexture ) {
+
+			image = Array.isArray( texture.image ) ? texture.image[ 0 ]?.[ 0 ] : texture.image;
+
+		}
+
 		if ( texture.isCompressedCubeTexture === true ) image = image[ 0 ];
 
 		if ( image ) {
@@ -567,13 +573,16 @@ class Textures extends DataMap {
 
 				target.width = image.width || 1;
 				target.height = image.height || 1;
-				target.depth = texture.isCubeTexture ? 6 : ( image.depth || 1 );
+				target.depth = texture.isCubeArrayTexture
+					? ( Array.isArray( texture.image ) ? texture.image.length * 6 : ( image.depth || 6 ) )
+					: ( texture.isCubeTexture ? 6 : ( image.depth || 1 ) );
 
 			}
 
 		} else {
 
-			target.width = target.height = target.depth = 1;
+			target.width = target.height = 1;
+			target.depth = texture.isCubeArrayTexture ? 6 : 1;
 
 		}
 
