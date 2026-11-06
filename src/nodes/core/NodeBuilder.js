@@ -2385,6 +2385,15 @@ class NodeBuilder {
 
 		}
 
+		if ( this.currentFunctionNode !== null ) {
+
+			// FunctionNode is cached per backend; its dependencies must survive builder reuse.
+			const uniforms = this.currentFunctionNode.uniforms || ( this.currentFunctionNode.uniforms = [] );
+
+			if ( uniforms.includes( nodeUniform ) === false ) uniforms.push( nodeUniform );
+
+		}
+
 		return nodeUniform;
 
 	}
@@ -2784,6 +2793,20 @@ class NodeBuilder {
 			this.currentFunctionNode = previous;
 
 			cache.set( shaderNode, fn );
+
+		}
+
+		// register the uniforms of the function in the current shader stage
+
+		const { uniforms } = fn;
+
+		if ( uniforms !== undefined ) {
+
+			for ( const uniform of uniforms ) {
+
+				this.getUniformFromNode( uniform.node, uniform.type, this.shaderStage, uniform.name );
+
+			}
 
 		}
 
