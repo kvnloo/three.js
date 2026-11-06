@@ -256,6 +256,7 @@ import './src/scenes/Scene.tests.js';
 import './src/textures/CanvasTexture.tests.js';
 import './src/textures/CompressedArrayTexture.tests.js';
 import './src/textures/CompressedTexture.tests.js';
+import './src/textures/CubeArrayTexture.tests.js';
 import './src/textures/CubeTexture.tests.js';
 import './src/textures/Data3DTexture.tests.js';
 import './src/textures/DataArrayTexture.tests.js';

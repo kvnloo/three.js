@@ -411,7 +411,11 @@ class WebGPUTextureUtils {
 
 		}
 
-		if ( texture.isCubeTexture ) {
+		if ( texture.isCubeArrayTexture ) {
+
+			textureDescriptorGPU.textureBindingViewDimension = GPUTextureViewDimension.CubeArray;
+
+		} else if ( texture.isCubeTexture ) {
 
 			textureDescriptorGPU.textureBindingViewDimension = GPUTextureViewDimension.Cube;
 
@@ -668,6 +672,14 @@ class WebGPUTextureUtils {
 			} else {
 
 				this._copyBufferToTexture( options.image, textureData.texture, textureDescriptorGPU, 0, texture.flipY );
+
+			}
+
+		} else if ( texture.isCubeArrayTexture ) {
+
+			if ( Array.isArray( texture.image ) ) {
+
+				this._copyCubeArrayToTexture( texture, textureData.texture, textureDescriptorGPU );
 
 			}
 
@@ -946,6 +958,60 @@ class WebGPUTextureUtils {
 	 * @param {GPUTexture} textureGPU - The GPU texture.
 	 * @param {Object} textureDescriptorGPU - The GPU texture descriptor.
 	 */
+	/**
+	 * Uploads an array of six-face cube images into consecutive GPU layers.
+	 *
+	 * @private
+	 * @param {CubeArrayTexture} texture - The cube array texture.
+	 * @param {GPUTexture} textureGPU - The GPU texture.
+	 * @param {Object} textureDescriptorGPU - The GPU texture descriptor.
+	 */
+	_copyCubeArrayToTexture( texture, textureGPU, textureDescriptorGPU ) {
+
+		const cubes = texture.image;
+		const mipmaps = texture.mipmaps;
+
+		for ( let cubeIndex = 0; cubeIndex < cubes.length; cubeIndex ++ ) {
+
+			const faces = cubes[ cubeIndex ];
+
+			for ( let faceIndex = 0; faceIndex < 6; faceIndex ++ ) {
+
+				const layerIndex = cubeIndex * 6 + ( texture.flipY === true ? _flipMap[ faceIndex ] : faceIndex );
+				const image = faces[ faceIndex ];
+
+				if ( image.isDataTexture === true ) {
+
+					this._copyBufferToTexture( image.image, textureGPU, textureDescriptorGPU, layerIndex, texture.flipY );
+
+				} else {
+
+					this._copyImageToTexture( image, textureGPU, textureDescriptorGPU, layerIndex, texture.flipY, texture.premultiplyAlpha );
+
+				}
+
+				for ( let mipLevel = 0; mipLevel < mipmaps.length; mipLevel ++ ) {
+
+					const mipImage = mipmaps[ mipLevel ].images[ cubeIndex ][ faceIndex ];
+
+					if ( mipImage.isDataTexture === true ) {
+
+						this._copyBufferToTexture( mipImage.image, textureGPU, textureDescriptorGPU, layerIndex, texture.flipY, 0, mipLevel + 1 );
+
+					} else {
+
+						this._copyImageToTexture( mipImage, textureGPU, textureDescriptorGPU, layerIndex, texture.flipY, texture.premultiplyAlpha, mipLevel + 1 );
+
+					}
+
+				}
+
+			}
+
+		}
+
+	}
+
 	_copyCubeMapToTexture( texture, textureGPU, textureDescriptorGPU ) {
 
 		const images = texture.images;
