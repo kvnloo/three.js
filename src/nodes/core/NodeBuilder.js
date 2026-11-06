@@ -2387,8 +2387,8 @@ class NodeBuilder {
 
 		if ( this.currentFunctionNode !== null ) {
 
-			const functionData = this.getDataFromNode( this.currentFunctionNode, 'any' );
-			const uniforms = functionData.uniforms || ( functionData.uniforms = [] );
+			// FunctionNode is cached per backend; its dependencies must survive builder reuse.
+			const uniforms = this.currentFunctionNode.uniforms || ( this.currentFunctionNode.uniforms = [] );
 
 			if ( uniforms.includes( nodeUniform ) === false ) uniforms.push( nodeUniform );
 
@@ -2798,7 +2798,7 @@ class NodeBuilder {
 
 		// register the uniforms of the function in the current shader stage
 
-		const { uniforms } = this.getDataFromNode( fn, 'any' );
+		const { uniforms } = fn;
 
 		if ( uniforms !== undefined ) {
 
