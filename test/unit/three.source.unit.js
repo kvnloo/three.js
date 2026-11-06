@@ -154,6 +154,7 @@ import './src/loaders/LoadingManager.tests.js';
 import './src/loaders/MaterialLoader.tests.js';
 import './src/loaders/ObjectLoader.tests.js';
 import './src/loaders/TextureLoader.tests.js';
+import './src/loaders/VRMLLoader.tests.js';
 
 
 //src/materials
