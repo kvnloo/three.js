@@ -261,6 +261,7 @@ import './src/textures/Data3DTexture.tests.js';
 import './src/textures/DataArrayTexture.tests.js';
 import './src/textures/DataTexture.tests.js';
 import './src/textures/DepthTexture.tests.js';
+import './src/textures/ExternalTexture.tests.js';
 import './src/textures/FramebufferTexture.tests.js';
 import './src/textures/Texture.tests.js';
 import './src/textures/TextureSource.tests.js';
