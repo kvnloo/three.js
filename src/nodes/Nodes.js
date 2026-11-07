@@ -100,6 +100,9 @@ export { default as AtomicFunctionNode } from './gpgpu/AtomicFunctionNode.js';
 export { default as BarrierNode } from './gpgpu/BarrierNode.js';
 export { default as ComputeBuiltinNode } from './gpgpu/ComputeBuiltinNode.js';
 export { default as ComputeNode } from './gpgpu/ComputeNode.js';
+export { default as ScopedArrayElementNode } from './gpgpu/ScopedArrayElementNode.js';
+export { default as ScopedArrayNode } from './gpgpu/ScopedArrayNode.js';
+export { default as ScopedVariableNode } from './gpgpu/ScopedVariableNode.js';
 export { default as SubgroupFunctionNode } from './gpgpu/SubgroupFunctionNode.js';
 export { default as WorkgroupInfoNode } from './gpgpu/WorkgroupInfoNode.js';
 

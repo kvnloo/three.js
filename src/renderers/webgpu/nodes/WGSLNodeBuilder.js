@@ -337,12 +337,13 @@ class WGSLNodeBuilder extends NodeBuilder {
 		this.directives = {};
 
 		/**
-		 * A map for managing scope arrays. Only relevant for when using
-		 * {@link WorkgroupInfoNode} in context of compute shaders.
+		 * A map for managing variables scoped to shader address spaces.
+		 * Shared by legacy WorkgroupInfoNode and ScopedVariableNode.
 		 *
 		 * @type {Map<string,Object>}
 		 */
-		this.scopedArrays = new Map();
+		this.scopedVariables = new Map();
+		this.scopedArrays = this.scopedVariables; // Legacy direct WorkgroupInfoNode users.
 
 		/**
 		 * A flag that indicates that early returns are allowed.
@@ -1855,28 +1856,20 @@ ${ flowData.code }
 	}
 
 	/**
-	 * This method should be used when a new scoped buffer is used in context of
-	 * compute shaders. It adds the array to the internal data structure which is
-	 * later used to generate the respective WGSL.
+	 * Registers a scoped array or scalar for WGSL compute generation.
 	 *
-	 * @param {string} name - The array name.
-	 * @param {string} scope - The scope.
-	 * @param {string} bufferType - The buffer type.
-	 * @param {string} bufferCount - The buffer count.
-	 * @param {boolean} isAtomic - Whether the array elements are atomic or not.
-	 * @return {string} The array name.
+	 * @param {string} name - The shader variable name.
+	 * @param {string} scope - The WGSL address space.
+	 * @param {string} type - The TSL element/value type.
+	 * @param {?number} [count=null] - Array length or null for a scalar.
+	 * @param {boolean} [isAtomic=false] - Whether elements are atomic.
+	 * @return {string} The variable name.
 	 */
-	getScopedArray( name, scope, bufferType, bufferCount, isAtomic ) {
+	getScopedVariable( name, scope, type, count = null, isAtomic = false ) {
 
-		if ( this.scopedArrays.has( name ) === false ) {
+		if ( this.scopedVariables.has( name ) === false ) {
 
-			this.scopedArrays.set( name, {
-				name,
-				scope,
-				bufferType,
-				bufferCount,
-				isAtomic
-			} );
+			this.scopedVariables.set( name, { name, scope, type, count, isAtomic } );
 
 		}
 
@@ -1885,33 +1878,56 @@ ${ flowData.code }
 	}
 
 	/**
-	 * Returns the scoped arrays of the given shader stage as a WGSL string.
+	 * Compatibility entry point for direct WorkgroupInfoNode usage.
+	 *
+	 * @param {string} name - The array name.
+	 * @param {string} scope - The workgroup scope.
+	 * @param {string} bufferType - The array element type.
+	 * @param {number} bufferCount - The array length.
+	 * @param {boolean} [isAtomic=false] - Whether elements are atomic.
+	 * @return {string} The array name.
+	 */
+	getScopedArray( name, scope, bufferType, bufferCount, isAtomic = false ) {
+
+		return this.getScopedVariable( name, scope, bufferType, bufferCount, isAtomic );
+
+	}
+
+	/**
+	 * Returns declarations for scoped variables in compute shaders.
 	 *
 	 * @param {string} shaderStage - The shader stage.
-	 * @return {string|undefined} The WGSL snippet that defines the scoped arrays.
-	 * Returns `undefined` when used in the vertex or fragment stage.
+	 * @return {string|undefined} WGSL declarations or undefined outside compute.
 	 */
-	getScopedArrays( shaderStage ) {
+	getScopedVariables( shaderStage ) {
 
-		if ( shaderStage !== 'compute' ) {
-
-			return;
-
-		}
+		if ( shaderStage !== 'compute' ) return;
 
 		const snippets = [];
 
-		for ( const { name, scope, bufferType, bufferCount, isAtomic } of this.scopedArrays.values() ) {
+		for ( const { name, scope, type, count, isAtomic } of this.scopedVariables.values() ) {
 
-			let type = this.getType( bufferType );
+			let resolvedType = this.getType( type );
 
-			if ( isAtomic === true ) type = `atomic<${type}>`;
+			if ( isAtomic === true ) resolvedType = `atomic<${resolvedType}>`;
 
-			snippets.push( `var<${scope}> ${name}: array< ${type}, ${bufferCount} >;` );
+			snippets.push( `${ this.getVar( resolvedType, name, count, `<${ scope }>` ) };` );
 
 		}
 
 		return snippets.join( '\n' );
+
+	}
+
+	/**
+	 * Compatibility entry point for existing callers of getScopedArrays().
+	 *
+	 * @param {string} shaderStage - The shader stage.
+	 * @return {string|undefined} WGSL declarations or undefined outside compute.
+	 */
+	getScopedArrays( shaderStage ) {
+
+		return this.getScopedVariables( shaderStage );
 
 	}
 
@@ -2423,7 +2439,7 @@ ${ flowData.code }
 			stageData.vars = this.getVars( shaderStage, allowGlobal );
 			stageData.codes = this.getCodes( shaderStage );
 			stageData.directives = this.getDirectives( shaderStage );
-			stageData.scopedArrays = this.getScopedArrays( shaderStage );
+			stageData.scopedArrays = this.getScopedVariables( shaderStage );
 
 			//
 

@@ -274,6 +274,9 @@ import './src/nodes/display/ViewportDepthTextureNode.tests.js';
 //src/nodes/lighting
 import './src/nodes/lighting/EnvironmentNode.tests.js';
 
+//src/nodes/gpgpu
+import './src/nodes/gpgpu/ScopedVariables.tests.js';
+
 //src/nodes/tsl
 import './src/nodes/tsl/TSLCore.tests.js';
 import './src/nodes/tsl/GPUTest.tests.js';
