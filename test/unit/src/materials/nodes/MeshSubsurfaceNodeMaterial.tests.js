@@ -3,7 +3,6 @@ import SSSSNode from '../../../../../examples/jsm/tsl/display/SSSSNode.js';
 import { PerspectiveCamera } from '../../../../../src/cameras/PerspectiveCamera.js';
 import { Texture } from '../../../../../src/textures/Texture.js';
 import { texture } from 'three/tsl';
-import { WebGPURenderer } from 'three/webgpu';
 import { BufferGeometry } from '../../../../../src/core/BufferGeometry.js';
 import { Mesh } from '../../../../../src/objects/Mesh.js';
 import { Scene } from '../../../../../src/scenes/Scene.js';
@@ -118,7 +117,11 @@ export default QUnit.module( 'Materials', () => {
 
 		QUnit.test( 'render-object hook composes the prior callback and restores it', ( assert ) => {
 
-			const renderer = new WebGPURenderer();
+			const renderer = {
+				_renderObjectFunction: null,
+				getRenderObjectFunction() { return this._renderObjectFunction; },
+				setRenderObjectFunction( callback ) { this._renderObjectFunction = callback; }
+			};
 			const calls = [];
 			const previousHook = function ( ...args ) {
 
@@ -166,7 +169,11 @@ export default QUnit.module( 'Materials', () => {
 
 		QUnit.test( 'disposing SSSS preserves a newer render-object callback', ( assert ) => {
 
-			const renderer = new WebGPURenderer();
+			const renderer = {
+				_renderObjectFunction: null,
+				getRenderObjectFunction() { return this._renderObjectFunction; },
+				setRenderObjectFunction( callback ) { this._renderObjectFunction = callback; }
+			};
 			let previousCalls = 0;
 			const previousHook = () => previousCalls ++;
 			renderer.setRenderObjectFunction( previousHook );
