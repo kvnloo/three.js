@@ -83,7 +83,7 @@ Sky.SkyShader = {
 		'mieDirectionalG': { value: 0.8 },
 		'sunPosition': { value: new Vector3() },
 		'cloudScale': { value: 0.0002 },
-		'cloudSpeed': { value: 0.0001 },
+		'cloudSpeed': { value: 0.00002 },
 		'cloudCoverage': { value: 0.4 },
 		'cloudDensity': { value: 0.4 },
 		'cloudElevation': { value: 0.5 },
@@ -143,7 +143,16 @@ Sky.SkyShader = {
 			vWorldPosition = worldPosition.xyz;
 
 			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-			gl_Position.z = gl_Position.w; // set z to camera.far
+
+			#ifdef USE_REVERSED_DEPTH_BUFFER
+
+				gl_Position.z = 0.0; // set z to camera.far
+
+			#else
+
+				gl_Position.z = gl_Position.w; // set z to camera.far
+
+			#endif
 
 			vSunDirection = normalize( sunPosition );
 

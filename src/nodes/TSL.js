@@ -25,6 +25,7 @@ export * from './math/BitcountNode.js';
 export * from './math/Hash.js';
 export * from './math/MathUtils.js';
 export * from './math/PackFloatNode.js';
+export * from './math/Packed4x8IntegerNode.js';
 export * from './math/UnpackFloatNode.js';
 export * from './math/TriNoise3D.js';
 
@@ -81,11 +82,13 @@ export * from './accessors/Normal.js';
 export * from './accessors/Object3DNode.js';
 export * from './accessors/PointUVNode.js';
 export * from './accessors/Position.js';
+export * from './accessors/ReferenceAttributeNode.js';
 export * from './accessors/ReferenceNode.js';
 export * from './accessors/ReflectVector.js';
 export * from './accessors/Skinning.js';
 export * from './accessors/SceneProperties.js';
 export * from './accessors/StorageBufferNode.js';
+export * from './accessors/StorageStructNode.js';
 export * from './accessors/StorageTexture3DNode.js';
 export * from './accessors/StorageTextureNode.js';
 export * from './accessors/Tangent.js';
@@ -161,6 +164,7 @@ export * from './shapes/Shapes.js';
 export * from './materialx/MaterialXNodes.js';
 
 // functions
+export { default as BRDF_EON, EON_DirectionalAlbedo } from './functions/BSDF/BRDF_EON.js';
 export { default as BRDF_GGX } from './functions/BSDF/BRDF_GGX.js';
 export { default as BRDF_Lambert } from './functions/BSDF/BRDF_Lambert.js';
 export { default as BRDF_Sheen } from './functions/BSDF/BRDF_Sheen.js';

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import * as TSL from 'three/tsl';
 import { EventDispatcher } from 'three';
 import { generateDeclarations } from '../utils/CodeEditorUtils.js';
-import { CodeCompiler } from '../code/CodeCompiler.js';
+import { formatCode } from '../code/CodeFormatter.js';
 
 let _monaco;
 let _monacoConfigured = false;
@@ -643,9 +643,9 @@ class CodeEditor extends EventDispatcher {
 				// Register formatting provider
 				_monaco.languages.registerDocumentFormattingEditProvider( 'javascript', {
 
-					provideDocumentFormattingEdits: async ( model ) => {
+					provideDocumentFormattingEdits: ( model ) => {
 
-						const formatted = await CodeCompiler.format( model.getValue() );
+						const formatted = formatCode( model.getValue() );
 
 						return [
 							{
@@ -758,7 +758,7 @@ class CodeEditor extends EventDispatcher {
 
 					updateHighlights();
 
-					if ( this.isProgrammaticChange ) return;
+					if ( this.readOnly || this.isProgrammaticChange ) return;
 
 					this.dispatchEvent( { type: 'change', value: this.editor.getValue() } );
 
@@ -922,9 +922,26 @@ class CodeEditor extends EventDispatcher {
 
 	}
 
+	setReadOnly( readOnly ) {
+
+		this.readOnly = readOnly;
+
+		if ( this.editor ) {
+
+			this.editor.updateOptions( {
+				readOnly: readOnly,
+				renderLineHighlight: readOnly ? 'none' : 'line',
+				hideCursorInOverviewRuler: readOnly,
+				overviewRulerBorder: ! readOnly
+			} );
+
+		}
+
+	}
+
 	format( formatted ) {
 
-		if ( ! this.editor ) return;
+		if ( ! this.editor || this.readOnly ) return;
 		const model = this.editor.getModel();
 		this.isProgrammaticChange = true;
 		try {

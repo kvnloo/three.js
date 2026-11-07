@@ -15,6 +15,7 @@ import {
 
 import {
 	Discard,
+	EPSILON,
 	Fn,
 	If,
 	atan,
@@ -668,10 +669,10 @@ function createStorageBuffers( count, centers, covariances, colors, sphericalHar
 		count,
 		sphericalHarmonicsDegree,
 		webGLBuffersEnabled: false,
-		centerRead: storage( centerAttribute, 'vec4', count ).toReadOnly(),
-		covarianceARead: storage( covarianceAAttribute, 'vec4', count ).toReadOnly(),
-		covarianceBRead: storage( covarianceBAttribute, 'vec4', count ).toReadOnly(),
-		colorRead: storage( colorAttribute, 'uint', count ).toReadOnly()
+		centerRead: storage( centerAttribute, 'vec4' ).toReadOnly(),
+		covarianceARead: storage( covarianceAAttribute, 'vec4' ).toReadOnly(),
+		covarianceBRead: storage( covarianceBAttribute, 'vec4' ).toReadOnly(),
+		colorRead: storage( colorAttribute, 'uint' ).toReadOnly()
 	};
 
 	for ( let degree = 1; degree <= sphericalHarmonicsDegree; degree ++ ) {
@@ -680,7 +681,7 @@ function createStorageBuffers( count, centers, covariances, colors, sphericalHar
 		const attribute = new StorageBufferAttribute( sphericalHarmonics[ `sh${ degree }` ], 1 );
 
 		buffers[ `sphericalHarmonics${ degree }Attribute` ] = attribute;
-		buffers[ `sphericalHarmonics${ degree }Read` ] = storage( attribute, 'uint', count * words ).toReadOnly();
+		buffers[ `sphericalHarmonics${ degree }Read` ] = storage( attribute, 'uint' ).toReadOnly();
 		buffers[ `sphericalHarmonics${ degree }Words` ] = words;
 
 	}
@@ -699,8 +700,8 @@ function ensureSphericalHarmonicsContributionBuffer( buffers ) {
 	// this additional buffer lazily only when the WebGPU pre-pass runs.
 	const attribute = new StorageBufferAttribute( new Float32Array( buffers.count * 4 ), 4 );
 
-	buffers.sphericalHarmonicsContributionRead = storage( attribute, 'vec4', buffers.count ).toReadOnly();
-	buffers.sphericalHarmonicsContributionWrite = storage( attribute, 'vec4', buffers.count );
+	buffers.sphericalHarmonicsContributionRead = storage( attribute, 'vec4' ).toReadOnly();
+	buffers.sphericalHarmonicsContributionWrite = storage( attribute, 'vec4' );
 
 }
 
@@ -957,14 +958,14 @@ function createMaterialNodes( buffers, sort, localCameraPosition ) {
 		const c = cBase.add( KERNEL_2D_SIZE ).toVar( 'cov2dC' );
 		const detBase = aBase.mul( cBase ).sub( b.mul( b ) ).toVar( 'detBase' );
 		const det = a.mul( c ).sub( b.mul( b ) ).toVar( 'det' );
-		const alphaScale = sqrt( max( detBase.div( max( det, 0.000001 ) ), 0 ) ).toVar( 'alphaScale' );
+		const alphaScale = sqrt( max( detBase.div( max( det, EPSILON ) ), 0 ) ).toVar( 'alphaScale' );
 
 		splatColor.assign( vec4( rgb.clamp( 0, 1 ), color.a.mul( alphaScale ) ) );
 
 		const halfTrace = a.add( c ).mul( 0.5 ).toVar( 'halfTrace' );
-		const radius = sqrt( max( a.sub( c ).mul( 0.5 ).pow2().add( b.mul( b ) ), 0.0000001 ) ).toVar( 'radius' );
-		const lambda1 = max( halfTrace.add( radius ), 0.0000001 ).toVar( 'lambda1' );
-		const lambda2 = max( halfTrace.sub( radius ), 0.0000001 ).toVar( 'lambda2' );
+		const radius = sqrt( max( a.sub( c ).mul( 0.5 ).pow2().add( b.mul( b ) ), EPSILON ) ).toVar( 'radius' );
+		const lambda1 = max( halfTrace.add( radius ), EPSILON ).toVar( 'lambda1' );
+		const lambda2 = max( halfTrace.sub( radius ), EPSILON ).toVar( 'lambda2' );
 		const axis1 = vec2( 1, 0 ).toVar( 'axis1' );
 
 		If( radius.greaterThan( 0.00001 ), () => {

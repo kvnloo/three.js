@@ -330,6 +330,47 @@ class GLSLNodeBuilder extends NodeBuilder {
 	}
 
 	/**
+	 * Returns the native snippet for a genuinely per-component vector select.
+	 * GLSL has no vector ternary, so `float` types use `mix()`'s `bvecN`-selector
+	 * overload; `int`/`uint`/`bool` types use an arithmetic select instead, since
+	 * that overload doesn't exist for them.
+	 *
+	 * @param {string} condSnippet - The per-component boolean (`bvecN`) condition.
+	 * @param {string} ifSnippet - The vector expression selected where `condSnippet` is `true`.
+	 * @param {string} elseSnippet - The vector expression selected where `condSnippet` is `false`.
+	 * @param {string} type - The (vector) type of `ifSnippet`/`elseSnippet`.
+	 * @return {string} The resolved method name.
+	 */
+	getVectorSelect( condSnippet, ifSnippet, elseSnippet, type ) {
+
+		const componentType = this.getComponentType( type );
+
+		if ( componentType === 'float' ) {
+
+			return `mix( ${elseSnippet}, ${ifSnippet}, ${condSnippet} )`;
+
+		}
+
+		const glslType = this.getType( type );
+
+		if ( componentType === 'bool' ) {
+
+			const intType = this.getType( this.getTypeFromLength( this.getTypeLength( type ), 'int' ) );
+			const maskSnippet = `${intType}( ${condSnippet} )`;
+			const ifIntSnippet = `${intType}( ${ifSnippet} )`;
+			const elseIntSnippet = `${intType}( ${elseSnippet} )`;
+
+			return `${glslType}( ${elseIntSnippet} + ${maskSnippet} * ( ${ifIntSnippet} - ${elseIntSnippet} ) )`;
+
+		}
+
+		const maskSnippet = `${glslType}( ${condSnippet} )`;
+
+		return `${elseSnippet} + ${maskSnippet} * ( ${ifSnippet} - ${elseSnippet} )`;
+
+	}
+
+	/**
 	 * Returns the output struct name. Not relevant for GLSL.
 	 *
 	 * @return {string}
@@ -560,7 +601,10 @@ ${ flowData.code }
 
 			}
 
-			this.addLineFlowCode( `${ propertyName } = ${prefix}(${ snippet })${channel}`, storageArrayElementNode );
+			const texelType = this.getTypeFromLength( itemSize, this.getComponentType( prefix ) );
+			const elementType = storageArrayElementNode.getNodeType( this );
+
+			this.addLineFlowCode( `${ propertyName } = ${ this.format( `${prefix}(${ snippet })${channel}`, texelType, elementType ) }`, storageArrayElementNode );
 
 			elementNodeData.propertyName = propertyName;
 
@@ -679,6 +723,18 @@ ${ flowData.code }
 	generateTextureLevel( texture, textureProperty, uvSnippet, levelSnippet, depthSnippet, offsetSnippet ) {
 
 		if ( depthSnippet ) uvSnippet = `vec3( ${ uvSnippet }, ${ depthSnippet } )`;
+
+		if ( texture.isDepthTexture ) {
+
+			if ( offsetSnippet ) {
+
+				return `textureLodOffset( ${ textureProperty }, ${ uvSnippet }, ${ levelSnippet }, ${ offsetSnippet } ).x`;
+
+			}
+
+			return `textureLod( ${ textureProperty }, ${ uvSnippet }, ${ levelSnippet } ).x`;
+
+		}
 
 		if ( offsetSnippet ) {
 
@@ -859,6 +915,41 @@ ${ flowData.code }
 	}
 
 	/**
+	 * Returns the uniform block name of the given buffer uniform.
+	 *
+	 * @param {NodeUniform} uniform - The buffer uniform.
+	 * @param {string} shaderStage - The shader stage.
+	 * @return {string} The uniform block name.
+	 */
+	getUniformBufferName( uniform, shaderStage ) {
+
+		return this.getDataFromNode( uniform.node, shaderStage, this.globalCache ).uniformGPU.name;
+
+	}
+
+	/**
+	 * Returns a bind group for the given group name and bindings. Uniform blocks are
+	 * named after their position in the group since shared bind groups are created
+	 * by one build but looked up by name in the programs of every build sharing them.
+	 *
+	 * @private
+	 * @param {string} groupName - The group name.
+	 * @param {Array<NodeUniformsGroup>} bindings - List of bindings.
+	 * @return {BindGroup} The bind group
+	 */
+	_getBindGroup( groupName, bindings ) {
+
+		for ( let i = 0; i < bindings.length; i ++ ) {
+
+			if ( bindings[ i ].isNodeUniformBuffer === true ) bindings[ i ].name = 'NodeBuffer_' + groupName + '_' + i;
+
+		}
+
+		return super._getBindGroup( groupName, bindings );
+
+	}
+
+	/**
 	 * Returns the uniforms of the given shader stage as a GLSL string.
 	 *
 	 * @param {string} shaderStage - The shader stage.
@@ -935,7 +1026,7 @@ ${ flowData.code }
 				const bufferCount = bufferNode.bufferCount;
 
 				const bufferCountSnippet = bufferCount > 0 ? bufferCount : '';
-				snippet = `${bufferNode.name} {\n\t${ bufferType } ${ uniform.name }[${ bufferCountSnippet }];\n};\n`;
+				snippet = `${ this.getUniformBufferName( uniform, shaderStage ) } {\n\t${ bufferType } ${ uniform.name }[${ bufferCountSnippet }];\n};\n`;
 
 			} else {
 
@@ -1138,6 +1229,34 @@ ${ flowData.code }
 	}
 
 	/**
+	 * Returns a single const variable statement as a GLSL string for the given variable type and name.
+	 *
+	 * @param {string} type - The variable's type.
+	 * @param {string} name - The variable's name.
+	 * @param {?number} [count=null] - The array length.
+	 * @return {string} The GLSL snippet that defines a const variable.
+	 */
+	generateConstStatement( type, name, count = null ) {
+
+		return `const ${ this.getVar( type, name, count ) }`;
+
+	}
+
+	/**
+	 * Returns a single variable statement as a GLSL string for the given variable type and name.
+	 *
+	 * @param {string} type - The variable's type.
+	 * @param {string} name - The variable's name.
+	 * @param {?number} [count=null] - The array length.
+	 * @return {string} The GLSL snippet that defines a variable.
+	 */
+	generateVarStatement( type, name, count = null ) {
+
+		return this.getVar( type, name, count );
+
+	}
+
+	/**
 	 * Returns the varyings of the given shader stage as a GLSL string.
 	 *
 	 * @param {string} shaderStage - The shader stage.
@@ -1145,7 +1264,7 @@ ${ flowData.code }
 	 */
 	getVaryings( shaderStage ) {
 
-		let snippet = '';
+		let snippet = shaderStage === 'vertex' && this.context.invariant === true ? 'invariant gl_Position;\n' : '';
 
 		const varyings = this.varyings;
 
@@ -1284,6 +1403,36 @@ ${ flowData.code }
 	getSubgroupIndex() {
 
 		error( 'GLSLNodeBuilder: WebGLBackend does not support the subgroupIndex node' );
+
+	}
+
+	/**
+	 * Enables subgroups.
+	 */
+	enableSubGroups() {
+
+		error( 'GLSLNodeBuilder: WebGLBackend does not support subgroup operations' );
+
+	}
+
+	/**
+	 * Enables 16 bit floats.
+	 */
+	enableShaderF16() {
+
+		error( 'GLSLNodeBuilder: WebGLBackend does not support 16 bit floats' );
+
+	}
+
+	/**
+	 * Enables dual source blending.
+	 *
+	 * WebGL 2 can express this through the `WEBGL_blend_func_extended` extension,
+	 * but WebGLBackend does not implement it.
+	 */
+	enableDualSourceBlending() {
+
+		error( 'GLSLNodeBuilder: WebGLBackend does not support dual source blending' );
 
 	}
 
@@ -1760,7 +1909,7 @@ void main() {
 	 */
 	getUniformFromNode( node, type, shaderStage, name = null ) {
 
-		const uniformNode = super.getUniformFromNode( node, type, shaderStage, name );
+		const uniformNode = super.getUniformFromNode( node, type, shaderStage, type === 'buffer' ? null : name );
 		const nodeData = this.getDataFromNode( node, shaderStage, this.globalCache );
 
 		let uniformGPU = nodeData.uniformGPU;
@@ -1789,22 +1938,7 @@ void main() {
 
 			} else if ( type === 'buffer' ) {
 
-				uniformNode.name = `buffer${ node.id }`;
-
-				const sharedData = this.getSharedDataFromNode( node );
-
-				let buffer = sharedData.buffer;
-
-				if ( buffer === undefined ) {
-
-					node.name = `NodeBuffer_${ node.id }`;
-
-					buffer = new NodeUniformBuffer( node, group );
-					buffer.name = node.name;
-
-					sharedData.buffer = buffer;
-
-				}
+				const buffer = new NodeUniformBuffer( node, group );
 
 				bindings.push( buffer );
 

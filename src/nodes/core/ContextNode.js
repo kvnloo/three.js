@@ -1,6 +1,7 @@
 import Node from './Node.js';
 import { addMethodChaining } from '../tsl/TSLCore.js';
 import { warn } from '../../utils.js';
+import { mergeContext } from './NodeUtils.js';
 
 /**
  * This node can be used as a context management component for another node.
@@ -62,6 +63,12 @@ class ContextNode extends Node {
 
 	}
 
+	isCacheable( /*builder*/ ) {
+
+		return false;
+
+	}
+
 	/**
 	 * This method is overwritten to ensure it returns the reference to {@link ContextNode#node}.
 	 *
@@ -92,19 +99,19 @@ class ContextNode extends Node {
 	 */
 	getFlowContextData() {
 
-		const children = [];
+		let data = {};
 
 		this.traverse( ( node ) => {
 
 			if ( node.isContextNode === true ) {
 
-				children.push( node.value );
+				data = mergeContext( data, node.value );
 
 			}
 
 		} );
 
-		return Object.assign( {}, ...children );
+		return data;
 
 	}
 
@@ -141,11 +148,9 @@ class ContextNode extends Node {
 
 		const previousContext = builder.addContext( this.value );
 
-		const node = this.node.build( builder );
+		this.node.build( builder );
 
 		builder.setContext( previousContext );
-
-		return node;
 
 	}
 

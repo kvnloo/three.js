@@ -7,9 +7,9 @@ import { NodeFrame, NodeUpdateType, StackTrace } from '../../../nodes/Nodes.js';
 import { renderGroup, cubeTexture, texture, fog, rangeFogFactor, densityFogFactor, reference, pmremTexture, screenUV, uniform } from '../../../nodes/TSL.js';
 import { builtin } from '../../../nodes/accessors/BuiltinNode.js';
 
-import { CubeUVReflectionMapping, EquirectangularReflectionMapping, EquirectangularRefractionMapping } from '../../../constants.js';
+import { EquirectangularReflectionMapping, EquirectangularRefractionMapping } from '../../../constants.js';
 import { hashArray } from '../../../nodes/core/NodeUtils.js';
-import { error } from '../../../utils.js';
+import { error, yieldToMain } from '../../../utils.js';
 
 const _chainKeys = [];
 const _cacheKeyValues = [];
@@ -189,13 +189,35 @@ class NodeManager extends DataMap {
 	}
 
 	/**
+	 * Logs an error thrown while building a node material.
+	 *
+	 * @private
+	 * @param {Error} e - The build error.
+	 */
+	_reportBuildError( e ) {
+
+		let stackTrace = e.stackTrace;
+
+		if ( ! stackTrace && e.stack ) {
+
+			// Capture stack trace for JavaScript errors
+
+			stackTrace = new StackTrace( e.stack );
+
+		}
+
+		error( 'TSL: ' + e, stackTrace );
+
+	}
+
+	/**
 	 * Returns a node builder state for the given render object.
 	 *
 	 * @param {RenderObject} renderObject - The render object.
-	 * @param {boolean} [useAsync=false] - Whether to use async build with yielding.
+	 * @param {?Function} [yieldFn=null] - If set, the build is async and yields to the main thread via this function.
 	 * @return {NodeBuilderState|Promise<NodeBuilderState>} The node builder state (or Promise if async).
 	 */
-	getForRender( renderObject, useAsync = false ) {
+	getForRender( renderObject, yieldFn = null ) {
 
 		const renderObjectData = this.get( renderObject );
 
@@ -217,9 +239,9 @@ class NodeManager extends DataMap {
 
 					try {
 
-						if ( useAsync ) {
+						if ( yieldFn !== null ) {
 
-							await nodeBuilder.buildAsync();
+							await nodeBuilder.buildAsync( yieldFn );
 
 						} else {
 
@@ -231,9 +253,9 @@ class NodeManager extends DataMap {
 
 						nodeBuilder = this._createNodeBuilder( renderObject, new NodeMaterial() );
 
-						if ( useAsync ) {
+						if ( yieldFn !== null ) {
 
-							await nodeBuilder.buildAsync();
+							await nodeBuilder.buildAsync( yieldFn );
 
 						} else {
 
@@ -241,7 +263,7 @@ class NodeManager extends DataMap {
 
 						}
 
-						error( 'TSL: ' + e );
+						this._reportBuildError( e );
 
 					}
 
@@ -249,12 +271,12 @@ class NodeManager extends DataMap {
 
 				};
 
-				if ( useAsync ) {
+				if ( yieldFn !== null ) {
 
 					return buildNodeBuilder().then( ( nodeBuilder ) => {
 
 						nodeBuilderState = this._createNodeBuilderState( nodeBuilder );
-						nodeBuilderCache.set( cacheKey, nodeBuilderState );
+						if ( nodeBuilder.objectSpecific === false ) nodeBuilderCache.set( cacheKey, nodeBuilderState );
 						nodeBuilderState.usedTimes ++;
 						renderObjectData.nodeBuilderState = nodeBuilderState;
 
@@ -276,23 +298,13 @@ class NodeManager extends DataMap {
 						nodeBuilder = this._createNodeBuilder( renderObject, new NodeMaterial() );
 						nodeBuilder.build();
 
-						let stackTrace = e.stackTrace;
-
-						if ( ! stackTrace && e.stack ) {
-
-							// Capture stack trace for JavaScript errors
-
-							stackTrace = new StackTrace( e.stack );
-
-						}
-
-						error( 'TSL: ' + e, stackTrace );
+						this._reportBuildError( e );
 
 					}
 
 					nodeBuilderState = this._createNodeBuilderState( nodeBuilder );
 
-					nodeBuilderCache.set( cacheKey, nodeBuilderState );
+					if ( nodeBuilder.objectSpecific === false ) nodeBuilderCache.set( cacheKey, nodeBuilderState );
 
 				}
 
@@ -313,11 +325,12 @@ class NodeManager extends DataMap {
 	 * Use this in compileAsync() to prevent blocking the main thread.
 	 *
 	 * @param {RenderObject} renderObject - The render object.
+	 * @param {Function} [yieldFn=yieldToMain] - The function used to yield to the main thread.
 	 * @return {Promise<NodeBuilderState>} A promise that resolves to the node builder state.
 	 */
-	getForRenderAsync( renderObject ) {
+	getForRenderAsync( renderObject, yieldFn = yieldToMain ) {
 
-		const result = this.getForRender( renderObject, true );
+		const result = this.getForRender( renderObject, yieldFn );
 
 		// Ensure we always return a Promise (cache hit returns nodeBuilderState directly)
 		if ( result.then ) {
@@ -451,9 +464,10 @@ class NodeManager extends DataMap {
 	 *
 	 * @param {Node} computeNode - The compute node.
 	 * @param {boolean} [useAsync=false] - Whether to use async build with yielding.
+	 * @param {Function} [yieldFn=yieldToMain] - The function used to yield to the main thread in an async build.
 	 * @return {NodeBuilderState|Promise<NodeBuilderState>} The node builder state (or Promise if async).
 	 */
-	getForCompute( computeNode, useAsync = false ) {
+	getForCompute( computeNode, useAsync = false, yieldFn = yieldToMain ) {
 
 		const computeData = this.get( computeNode );
 
@@ -470,7 +484,7 @@ class NodeManager extends DataMap {
 
 			if ( useAsync ) {
 
-				return nodeBuilder.buildAsync().then( () => {
+				return nodeBuilder.buildAsync( yieldFn ).then( () => {
 
 					nodeBuilderState = this._createNodeBuilderState( nodeBuilder );
 
@@ -501,11 +515,12 @@ class NodeManager extends DataMap {
 	 * Use this in compileComputeAsync() to prevent blocking the main thread.
 	 *
 	 * @param {Node} computeNode - The compute node.
+	 * @param {Function} [yieldFn=yieldToMain] - The function used to yield to the main thread.
 	 * @return {Promise<NodeBuilderState>} A promise that resolves to the node builder state.
 	 */
-	getForComputeAsync( computeNode ) {
+	getForComputeAsync( computeNode, yieldFn = yieldToMain ) {
 
-		const result = this.getForCompute( computeNode, true );
+		const result = this.getForCompute( computeNode, true, yieldFn );
 
 		if ( result.then ) {
 
@@ -625,6 +640,40 @@ class NodeManager extends DataMap {
 	}
 
 	/**
+	 * Returns the custom program cache key of the given material. Since
+	 * computing the key traverses the material's node graph, the result
+	 * is cached per material version if possible.
+	 *
+	 * @param {Material} material - The material.
+	 * @param {Scene} scene - The scene.
+	 * @return {string} The custom program cache key.
+	 */
+	getCustomProgramCacheKey( material, scene ) {
+
+		if ( material === scene.overrideMaterial ) {
+
+			// override materials can't be cached since they dynamically change node properties
+
+			return material.customProgramCacheKey();
+
+		} else {
+
+			const materialData = this.get( material );
+
+			if ( materialData.cacheKeyVersion !== material.version ) {
+
+				materialData.cacheKeyVersion = material.version;
+				materialData.cacheKey = material.customProgramCacheKey();
+
+			}
+
+			return materialData.cacheKey;
+
+		}
+
+	}
+
+	/**
 	 * Returns a cache key for the given scene and lights node.
 	 * This key is used by `RenderObject` as a part of the dynamic
 	 * cache key (a key that must be checked every time the render
@@ -710,9 +759,9 @@ class NodeManager extends DataMap {
 
 				const backgroundNode = this.getCacheNode( 'background', background, () => {
 
-					if ( background.isCubeTexture === true || ( background.mapping === EquirectangularReflectionMapping || background.mapping === EquirectangularRefractionMapping || background.mapping === CubeUVReflectionMapping ) ) {
+					if ( background.isCubeTexture === true || background.mapping === EquirectangularReflectionMapping || background.mapping === EquirectangularRefractionMapping ) {
 
-						if ( scene.backgroundBlurriness > 0 || background.mapping === CubeUVReflectionMapping ) {
+						if ( scene.backgroundBlurriness > 0 || background.isPMREMTexture === true ) {
 
 							return pmremTexture( background );
 

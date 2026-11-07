@@ -239,7 +239,7 @@ class ShadowNode extends ShadowBaseNode {
 		 *
 		 * @type {number}
 		 * @readonly
-		 * @default true
+		 * @default 0
 		 */
 		this.depthLayer = 0;
 
@@ -376,6 +376,7 @@ class ShadowNode extends ShadowBaseNode {
 		}
 
 		shadow.camera.coordinateSystem = camera.coordinateSystem;
+		shadow.camera._reversedDepth = renderer.reversedDepthBuffer;
 		shadow.camera.updateProjectionMatrix();
 
 		// VSM
@@ -527,6 +528,7 @@ class ShadowNode extends ShadowBaseNode {
 
 		this.shadowMap = shadowMap;
 		this.shadow.map = shadowMap;
+		this.shadow.needsUpdate = true;
 
 		// Shadow Output + Inspector
 
@@ -534,7 +536,7 @@ class ShadowNode extends ShadowBaseNode {
 
 		if ( shadowColor ) {
 
-			shadowOutput.toInspector( `${ inspectName } / Color`, () => {
+			shadowColor.toInspector( `${ inspectName } / Color`, () => {
 
 				if ( this.shadowMap.texture.isCubeTexture ) {
 
@@ -669,9 +671,6 @@ class ShadowNode extends ShadowBaseNode {
 
 		const shadowType = renderer.shadowMap.type;
 
-		const depthVersion = shadowMap.depthTexture.version;
-		this._depthVersionCached = depthVersion;
-
 		const _shadowCameraLayer = shadow.camera.layers.mask;
 
 		if ( ( shadow.camera.layers.mask & 0xFFFFFFFE ) === 0 ) {
@@ -692,7 +691,14 @@ class ShadowNode extends ShadowBaseNode {
 
 		renderer.setRenderTarget( shadowMap );
 
+		const currentMatrixWorldAutoUpdate = scene.matrixWorldAutoUpdate;
+
+		// The scene was already updated by the enclosing render.
+		scene.matrixWorldAutoUpdate = false;
+
 		this.renderShadow( frame );
+
+		scene.matrixWorldAutoUpdate = currentMatrixWorldAutoUpdate;
 
 		renderer.setRenderObjectFunction( currentRenderObjectFunction );
 
@@ -793,7 +799,7 @@ class ShadowNode extends ShadowBaseNode {
 
 		// do not render shadow maps during precompilation
 
-		if ( frame.renderer._isPreCompiling === true ) return;
+		if ( frame.renderer._precompilationState !== null ) return;
 
 		const { shadow } = this;
 
@@ -815,11 +821,7 @@ class ShadowNode extends ShadowBaseNode {
 
 			this.updateShadow( frame );
 
-			if ( this.shadowMap.depthTexture.version === this._depthVersionCached ) {
-
-				shadow.needsUpdate = false;
-
-			}
+			shadow.needsUpdate = false;
 
 		}
 
