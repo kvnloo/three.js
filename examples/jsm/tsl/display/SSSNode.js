@@ -1,5 +1,5 @@
-import { RedFormat, RenderTarget, Vector2, RendererUtils, QuadMesh, TempNode, NodeMaterial, NodeUpdateType, UnsignedByteType } from 'three/webgpu';
-import { reference, viewZToPerspectiveDepth, logarithmicDepthToViewZ, getScreenPosition, getViewPosition, float, Break, Loop, int, max, abs, If, interleavedGradientNoise, screenCoordinate, nodeObject, Fn, passTexture, uv, uniform, perspectiveDepthToViewZ, orthographicDepthToViewZ, vec2, lightPosition, lightTargetPosition, fract, rand, mix } from 'three/tsl';
+import { RedFormat, RenderTarget, Vector2, RendererUtils, QuadMesh, Node, NodeMaterial, NodeUpdateType, UnsignedByteType } from 'three/webgpu';
+import { reference, getScreenPosition, getViewPosition, float, Break, Loop, int, max, abs, If, interleavedGradientNoise, screenCoordinate, Fn, passTexture, uv, uniform, perspectiveDepthToViewZ, orthographicDepthToViewZ, vec2, lightPosition, lightTargetPosition, fract, rand, mix, context, isBackgroundDepth, projectionDepth } from 'three/tsl';
 
 const _quadMesh = /*@__PURE__*/ new QuadMesh();
 const _size = /*@__PURE__*/ new Vector2();
@@ -30,20 +30,20 @@ let _rendererState;
  *
  * - Ideally the maximum shadow length should not exceed `1` meter. Otherwise the effect gets
  * computationally very expensive since more samples during the ray marching process are evaluated.
- * You can mitigate this issue by reducing the `quality` paramter.
+ * You can mitigate this issue by reducing the `quality` parameter.
  * - The effect can only be used with a single directional light, the main light of your scene.
  * This main light usually represents the sun or daylight.
  * - Like other Screen-Space techniques SSS can only honor objects in the shadowing computation that
  * are currently visible within the camera's view.
  *
  * References:
- * - {@link https://panoskarabelas.com/posts/screen_space_shadows/}.
+ * - {@link https://panoskarabelas.com/blog/posts/screen_space_shadows/}.
  * - {@link https://www.bendstudio.com/blog/inside-bend-screen-space-shadows/}.
  *
- * @augments TempNode
+ * @augments Node
  * @three_import import { sss } from 'three/addons/tsl/display/SSSNode.js';
  */
-class SSSNode extends TempNode {
+class SSSNode extends Node {
 
 	static get type() {
 
@@ -121,7 +121,7 @@ class SSSNode extends TempNode {
 
 		/**
 		 * Whether to use temporal filtering or not. Setting this property to
-		 * `true` requires the usage of `TRAANode`. This will help to reduce noice
+		 * `true` requires the usage of `TRAANode`. This will help to reduce noise
 		 * although it introduces typical TAA artifacts like ghosting and temporal
 		 * instabilities.
 		 *
@@ -357,26 +357,12 @@ class SSSNode extends TempNode {
 
 		} );
 
-		const sampleDepth = ( uv ) => {
-
-			const depth = this.depthNode.sample( uv ).r;
-
-			if ( builder.renderer.logarithmicDepthBuffer === true ) {
-
-				const viewZ = logarithmicDepthToViewZ( depth, this._cameraNear, this._cameraFar );
-
-				return viewZToPerspectiveDepth( viewZ, this._cameraNear, this._cameraFar );
-
-			}
-
-			return depth;
-
-		};
+		const sampleDepth = ( uv ) => projectionDepth( this.depthNode.sample( uv ).r, this._cameraNear, this._cameraFar );
 
 		const sss = Fn( () => {
 
 			const depth = sampleDepth( uvNode ).toVar();
-			depth.greaterThanEqual( 1.0 ).discard();
+			isBackgroundDepth( depth ).discard();
 
 			// compute ray position and direction (in view-space)
 
@@ -454,7 +440,8 @@ class SSSNode extends TempNode {
 
 		} );
 
-		this._material.fragmentNode = sss().context( builder.getSharedContext() );
+		this._material.contextNode = context( builder.getSharedContext() );
+		this._material.fragmentNode = sss();
 		this._material.needsUpdate = true;
 
 		return this._textureNode;
@@ -466,6 +453,8 @@ class SSSNode extends TempNode {
 	 * when the effect is no longer required.
 	 */
 	dispose() {
+
+		super.dispose();
 
 		this._sssRenderTarget.dispose();
 
@@ -487,4 +476,4 @@ export default SSSNode;
  * @param {DirectionalLight} mainLight - The main directional light of the scene.
  * @returns {SSSNode}
  */
-export const sss = ( depthNode, camera, mainLight ) => nodeObject( new SSSNode( depthNode, camera, mainLight ) );
+export const sss = ( depthNode, camera, mainLight ) => new SSSNode( depthNode, camera, mainLight );

@@ -1,5 +1,5 @@
-import { Frustum, Matrix4, RenderTarget, Vector2, RendererUtils, QuadMesh, TempNode, NodeMaterial, NodeUpdateType, Vector3, Plane, WebGPUCoordinateSystem } from 'three/webgpu';
-import { cubeTexture, clamp, viewZToPerspectiveDepth, logarithmicDepthToViewZ, float, Loop, max, nodeObject, Fn, passTexture, uv, dot, uniformArray, If, getViewPosition, uniform, vec4, add, interleavedGradientNoise, screenCoordinate, round, mul, uint, mix, exp, vec3, distance, pow, reference, lightPosition, vec2, bool, texture, perspectiveDepthToViewZ, lightShadowMatrix } from 'three/tsl';
+import { Frustum, Matrix4, RenderTarget, Vector2, RendererUtils, QuadMesh, Node, NodeMaterial, NodeUpdateType, Vector3, Plane } from 'three/webgpu';
+import { cubeTexture, clamp, viewZToPerspectiveDepth, float, Loop, max, Fn, passTexture, uv, dot, uniformArray, If, getViewPosition, uniform, vec4, add, interleavedGradientNoise, screenCoordinate, round, mul, uint, mix, exp, vec3, distance, pow, reference, lightPosition, vec2, bool, texture, orthographicDepthToViewZ, lightShadowMatrix, context, projectionDepth } from 'three/tsl';
 
 const _quadMesh = /*@__PURE__*/ new QuadMesh();
 const _size = /*@__PURE__*/ new Vector2();
@@ -45,10 +45,10 @@ let _rendererState;
  *
  * Reference: This Node is a part of [three-good-godrays](https://github.com/Ameobea/three-good-godrays).
  *
- * @augments TempNode
+ * @augments Node
  * @three_import import { godrays } from 'three/addons/tsl/display/GodraysNode.js';
  */
-class GodraysNode extends TempNode {
+class GodraysNode extends Node {
 
 	static get type() {
 
@@ -351,26 +351,10 @@ class GodraysNode extends TempNode {
 	 */
 	setup( builder ) {
 
-		const { renderer } = builder;
-
 		const uvNode = uv();
 		const lightPos = lightPosition( this._light );
 
-		const sampleDepth = ( uv ) => {
-
-			const depth = this.depthNode.sample( uv ).r;
-
-			if ( builder.renderer.logarithmicDepthBuffer === true ) {
-
-				const viewZ = logarithmicDepthToViewZ( depth, this._cameraNear, this._cameraFar );
-
-				return viewZToPerspectiveDepth( viewZ, this._cameraNear, this._cameraFar );
-
-			}
-
-			return depth;
-
-		};
+		const sampleDepth = ( uv ) => projectionDepth( this.depthNode.sample( uv ).r, this._cameraNear, this._cameraFar );
 
 		const sdPlane = ( p, n, h ) => {
 
@@ -389,15 +373,8 @@ class GodraysNode extends TempNode {
 
 			const shadowPosition = lightShadowMatrix( this._light ).mul( worldPos );
 			const shadowCoord = shadowPosition.xyz.div( shadowPosition.w );
-			let coordZ = shadowCoord.z;
 
-			if ( renderer.coordinateSystem === WebGPUCoordinateSystem ) {
-
-				coordZ = coordZ.mul( 2 ).sub( 1 ); // WebGPU: Conversion [ 0, 1 ] to [ - 1, 1 ]
-
-			}
-
-			return vec3( shadowCoord.x, shadowCoord.y.oneMinus(), coordZ );
+			return vec3( shadowCoord.x, shadowCoord.y.oneMinus(), shadowCoord.z );
 
 		};
 
@@ -433,7 +410,7 @@ class GodraysNode extends TempNode {
 
 					const result = texture( this._light.shadow.map.depthTexture, shadowCoord.xy ).compare( shadowCoord.z ).r;
 
-					const viewZ = perspectiveDepthToViewZ( shadowCoord.z, this._shadowCameraNear, this._shadowCameraFar );
+					const viewZ = orthographicDepthToViewZ( shadowCoord.z, this._shadowCameraNear, this._shadowCameraFar );
 
 					output.assign( vec2( result.oneMinus(), viewZ.negate() ) );
 
@@ -443,7 +420,7 @@ class GodraysNode extends TempNode {
 
 			} else {
 
-				throw new Error( 'GodraysNode: Unsupported light type.' );
+				throw new Error( 'THREE.GodraysNode: Unsupported light type.' );
 
 			}
 
@@ -588,7 +565,8 @@ class GodraysNode extends TempNode {
 
 		} );
 
-		this._material.fragmentNode = godrays().context( builder.getSharedContext() );
+		this._material.contextNode = context( builder.getSharedContext() );
+		this._material.fragmentNode = godrays();
 		this._material.needsUpdate = true;
 
 		return this._textureNode;
@@ -600,6 +578,8 @@ class GodraysNode extends TempNode {
 	 * when the effect is no longer required.
 	 */
 	dispose() {
+
+		super.dispose();
 
 		this._godraysRenderTarget.dispose();
 
@@ -621,4 +601,4 @@ export default GodraysNode;
  * @param {(DirectionalLight|PointLight)} light - The light the godrays are rendered for.
  * @returns {GodraysNode}
  */
-export const godrays = ( depthNode, camera, light ) => nodeObject( new GodraysNode( depthNode, camera, light ) );
+export const godrays = ( depthNode, camera, light ) => new GodraysNode( depthNode, camera, light );

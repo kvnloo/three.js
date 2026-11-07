@@ -1,4 +1,4 @@
-import TempNode from '../core/TempNode.js';
+import Node from '../core/Node.js';
 import { addMethodChaining, mat3, nodeObject, vec4 } from '../tsl/TSLCore.js';
 
 import { SRGBTransfer } from '../../constants.js';
@@ -13,9 +13,9 @@ const OUTPUT_COLOR_SPACE = 'OutputColorSpace';
  * This node represents a color space conversion. Meaning it converts
  * a color value from a source to a target color space.
  *
- * @augments TempNode
+ * @augments Node
  */
-class ColorSpaceNode extends TempNode {
+class ColorSpaceNode extends Node {
 
 	static get type() {
 
@@ -135,7 +135,7 @@ export default ColorSpaceNode;
  * @param {string} targetColorSpace - The target color space.
  * @returns {ColorSpaceNode}
  */
-export const workingToColorSpace = ( node, targetColorSpace ) => nodeObject( new ColorSpaceNode( nodeObject( node ), WORKING_COLOR_SPACE, targetColorSpace ) );
+export const workingToColorSpace = ( node, targetColorSpace ) => new ColorSpaceNode( nodeObject( node ), WORKING_COLOR_SPACE, targetColorSpace );
 
 /**
  * TSL function for converting a given color node from the given color space to the current working color space.
@@ -146,7 +146,7 @@ export const workingToColorSpace = ( node, targetColorSpace ) => nodeObject( new
  * @param {string} sourceColorSpace - The source color space.
  * @returns {ColorSpaceNode}
  */
-export const colorSpaceToWorking = ( node, sourceColorSpace ) => nodeObject( new ColorSpaceNode( nodeObject( node ), sourceColorSpace, WORKING_COLOR_SPACE ) );
+export const colorSpaceToWorking = ( node, sourceColorSpace ) => new ColorSpaceNode( nodeObject( node ), sourceColorSpace, WORKING_COLOR_SPACE );
 
 /**
  * TSL function for converting a given color node from one color space to another one.
@@ -158,7 +158,7 @@ export const colorSpaceToWorking = ( node, sourceColorSpace ) => nodeObject( new
  * @param {string} targetColorSpace - The target color space.
  * @returns {ColorSpaceNode}
  */
-export const convertColorSpace = ( node, sourceColorSpace, targetColorSpace ) => nodeObject( new ColorSpaceNode( nodeObject( node ), sourceColorSpace, targetColorSpace ) );
+export const convertColorSpace = ( node, sourceColorSpace, targetColorSpace ) => new ColorSpaceNode( nodeObject( node ), sourceColorSpace, targetColorSpace );
 
 addMethodChaining( 'workingToColorSpace', workingToColorSpace );
 addMethodChaining( 'colorSpaceToWorking', colorSpaceToWorking );

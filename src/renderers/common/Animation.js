@@ -10,7 +10,7 @@ class Animation {
 	 * Constructs a new animation loop management component.
 	 *
 	 * @param {Renderer} renderer - A reference to the main renderer.
-	 * @param {Nodes} nodes - Renderer component for managing nodes related logic.
+	 * @param {NodeManager} nodes - Renderer component for managing nodes related logic.
 	 * @param {Info} info - Renderer component for managing metrics and monitoring data.
 	 */
 	constructor( renderer, nodes, info ) {
@@ -25,7 +25,7 @@ class Animation {
 		/**
 		 * Renderer component for managing nodes related logic.
 		 *
-		 * @type {Nodes}
+		 * @type {NodeManager}
 		 */
 		this.nodes = nodes;
 
@@ -64,13 +64,21 @@ class Animation {
 	}
 
 	/**
-	 * Starts the internal animation loop.
+	 * Starts the internal animation loop, if it is not running yet.
 	 */
 	start() {
+
+		if ( this._requestId !== null ) return;
 
 		const update = ( time, xrFrame ) => {
 
 			this._requestId = this._context.requestAnimationFrame( update );
+
+			if ( this.renderer._inspector.isRunning ) {
+
+				this.renderer._inspector.finish();
+
+			}
 
 			if ( this.info.autoReset === true ) this.info.reset();
 
@@ -80,9 +88,11 @@ class Animation {
 
 			this.renderer._inspector.begin();
 
-			if ( this._animationLoop !== null ) this._animationLoop( time, xrFrame );
+			if ( this._animationLoop !== null ) {
 
-			this.renderer._inspector.finish();
+				this._animationLoop( time, xrFrame );
+
+			}
 
 		};
 
@@ -95,7 +105,9 @@ class Animation {
 	 */
 	stop() {
 
-		this._context.cancelAnimationFrame( this._requestId );
+		if ( this.renderer._inspector.isRunning ) this.renderer._inspector.finish();
+
+		if ( this._context !== null ) this._context.cancelAnimationFrame( this._requestId );
 
 		this._requestId = null;
 
@@ -151,6 +163,8 @@ class Animation {
 	dispose() {
 
 		this.stop();
+
+		this._animationLoop = null;
 
 	}
 

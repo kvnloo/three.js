@@ -1,4 +1,4 @@
-import TempNode from '../core/TempNode.js';
+import Node from '../core/Node.js';
 import { addMethodChaining, nodeArray, nodeObject, nodeObjects, float } from '../tsl/TSLCore.js';
 import { error } from '../../utils.js';
 
@@ -7,9 +7,9 @@ import { error } from '../../utils.js';
  * with this module since they use the predefined TSL syntax `wgslFn` and `glslFn` which encapsulate
  * this logic.
  *
- * @augments TempNode
+ * @augments Node
  */
-class FunctionCallNode extends TempNode {
+class FunctionCallNode extends Node {
 
 	static get type() {
 
@@ -76,7 +76,7 @@ class FunctionCallNode extends TempNode {
 	 * @param {NodeBuilder} builder - The current node builder.
 	 * @returns {string} The type of this node.
 	 */
-	getNodeType( builder ) {
+	generateNodeType( builder ) {
 
 		return this.functionNode.getNodeType( builder );
 

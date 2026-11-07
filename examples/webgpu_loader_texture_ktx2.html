@@ -4,6 +4,10 @@
 		<title>three.js WebGPU - KTX2 texture loader</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<meta property="og:title" content="three.js WebGPU - KTX2 texture loader">
+		<meta property="og:type" content="website">
+		<meta property="og:url" content="https://threejs.org/examples/webgpu_loader_texture_ktx2.html">
+		<meta property="og:image" content="https://threejs.org/examples/screenshots/webgpu_loader_texture_ktx2.jpg">
 		<link type="text/css" rel="stylesheet" href="main.css">
 		<style>
 			* {
@@ -88,31 +92,29 @@
 
 			import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 
-			const canvas = document.getElementById( 'c' );
-
-			const renderer = new THREE.WebGPURenderer( { canvas, antialias: true, forceWebGL: false } );
-			renderer.setClearColor( 0xffffff, 1 );
-			renderer.setPixelRatio( window.devicePixelRatio );
-
-			const loader = new KTX2Loader()
-				.setTranscoderPath( 'jsm/libs/basis/' )
-				.setPath( 'textures/ktx2/' );
+			let canvas, renderer;
 
 			const scenes = [];
 
-			let sections;
+			init();
 
-			initRenderer();
+			async function init() {
 
-			async function initRenderer() {
-			
+				canvas = document.getElementById( 'c' );
+
+				renderer = new THREE.WebGPURenderer( { canvas, antialias: true, forceWebGL: false } );
+				renderer.setClearColor( 0xffffff, 1 );
+				renderer.setPixelRatio( window.devicePixelRatio );
+
 				await renderer.init();
 
-				loader.detectSupport( renderer );
+				const loader = new KTX2Loader()
+					.setPath( 'textures/ktx2/' )
+					.detectSupport( renderer );
 
 				const formats = loader.workerConfig;
 
-				sections = [
+				const sections = [
 					{
 						title: 'Uncompressed',
 						description: 'Uncompressed formats (rgba8, rgba16, rgba32) load as THREE.DataTexture objects.'
@@ -132,14 +134,14 @@
 							+ ' reducing memory cost. Requires native support on the device GPU: no single compressed'
 							+ ' format is supported on every device.',
 						textures: [
-							{ path: '2d_astc4x4.ktx2', supported: formats[ 'astcSupported' ] },
-							{ path: '2d_etc1.ktx2', supported: formats[ 'etc2Supported' ] },
-							{ path: '2d_etc2.ktx2', supported: formats[ 'etc2Supported' ] },
-							{ path: '2d_bc1.ktx2', supported: formats[ 'bptcSupported' ] },
-							{ path: '2d_bc3.ktx2', supported: formats[ 'bptcSupported' ] },
-							{ path: '2d_bc4.ktx2', supported: formats[ 'bptcSupported' ] },
-							{ path: '2d_bc5.ktx2', supported: formats[ 'bptcSupported' ] },
-							{ path: '2d_bc7.ktx2', supported: formats[ 'bptcSupported' ] }
+							{ path: '2d_astc4x4.ktx2', supported: formats.astcSupported },
+							{ path: '2d_etc1.ktx2', supported: formats.etc2Supported },
+							{ path: '2d_etc2.ktx2', supported: formats.etc2Supported },
+							{ path: '2d_bc1.ktx2', supported: formats.bptcSupported },
+							{ path: '2d_bc3.ktx2', supported: formats.bptcSupported },
+							{ path: '2d_bc4.ktx2', supported: formats.bptcSupported },
+							{ path: '2d_bc5.ktx2', supported: formats.bptcSupported },
+							{ path: '2d_bc7.ktx2', supported: formats.bptcSupported },
 						]
 					},
 
@@ -154,12 +156,6 @@
 						]
 					},
 				];
-
-				await init();
-			
-			}
-
-			async function init() {
 
 				const geometry = flipY( new THREE.PlaneGeometry( 1, 1 ) );
 

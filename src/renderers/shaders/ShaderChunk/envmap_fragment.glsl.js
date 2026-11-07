@@ -16,7 +16,7 @@ export default /* glsl */`
 		}
 
 		// Transforming Normal Vectors with the Inverse Transformation
-		vec3 worldNormal = inverseTransformDirection( normal, viewMatrix );
+		vec3 worldNormal = transformNormalByInverseViewMatrix( normal, viewMatrix );
 
 		#ifdef ENVMAP_MODE_REFLECTION
 
@@ -36,7 +36,7 @@ export default /* glsl */`
 
 	#ifdef ENVMAP_TYPE_CUBE
 
-		vec4 envColor = textureCube( envMap, envMapRotation * vec3( flipEnvMap * reflectVec.x, reflectVec.yz ) );
+		vec4 envColor = textureCube( envMap, envMapRotation * reflectVec );
 
 		#ifdef ENVMAP_BLENDING_MULTIPLY
 

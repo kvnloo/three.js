@@ -1,3 +1,5 @@
+import { AlwaysDepth, EqualDepth, GreaterDepth, GreaterEqualDepth, LessDepth, LessEqualDepth, NeverDepth, NotEqualDepth } from './constants.js';
+
 /**
  * Finds the minimum value in an array.
  *
@@ -346,6 +348,28 @@ function warnOnce( ...params ) {
 }
 
 /**
+ * Yields execution to the main thread to allow rendering and other tasks.
+ * Uses scheduler.yield() when available (Chrome 115+), falls back to requestAnimationFrame.
+ *
+ * @return {Promise<void>}
+ */
+function yieldToMain() {
+
+	if ( typeof self !== 'undefined' && typeof self.scheduler !== 'undefined' && typeof self.scheduler.yield !== 'undefined' ) {
+
+		return self.scheduler.yield();
+
+	}
+
+	return new Promise( resolve => {
+
+		requestAnimationFrame( resolve );
+
+	} );
+
+}
+
+/**
  * Asynchronously probes for WebGL sync object completion.
  *
  * This function creates a promise that resolves when the WebGL sync object
@@ -354,7 +378,7 @@ function warnOnce( ...params ) {
  * main thread. This is useful for GPU-CPU synchronization in WebGL contexts.
  *
  * @private
- * @param {WebGLRenderingContext|WebGL2RenderingContext} gl - The WebGL rendering context.
+ * @param {WebGL2RenderingContext} gl - The WebGL rendering context.
  * @param {WebGLSync} sync - The WebGL sync object to wait for.
  * @param {number} interval - The polling interval in milliseconds.
  * @return {Promise<void>} A promise that resolves when the sync completes or rejects if it fails.
@@ -447,4 +471,23 @@ function toReversedProjectionMatrix( projectionMatrix ) {
 
 }
 
-export { arrayMin, arrayMax, arrayNeedsUint32, getTypedArray, createElementNS, createCanvasElement, setConsoleFunction, getConsoleFunction, log, warn, error, warnOnce, probeAsync, toNormalizedProjectionMatrix, toReversedProjectionMatrix, isTypedArray };
+/**
+ * Used to select the correct depth functions
+ * when reversed depth buffer is used.
+ *
+ * @private
+ * @type {Object}
+ */
+const ReversedDepthFuncs = {
+	[ NeverDepth ]: NeverDepth,
+	[ LessDepth ]: GreaterDepth,
+	[ EqualDepth ]: EqualDepth,
+	[ LessEqualDepth ]: GreaterEqualDepth,
+
+	[ AlwaysDepth ]: AlwaysDepth,
+	[ GreaterDepth ]: LessDepth,
+	[ NotEqualDepth ]: NotEqualDepth,
+	[ GreaterEqualDepth ]: LessEqualDepth,
+};
+
+export { arrayMin, arrayMax, arrayNeedsUint32, getTypedArray, createElementNS, createCanvasElement, setConsoleFunction, getConsoleFunction, log, warn, error, warnOnce, probeAsync, yieldToMain, toNormalizedProjectionMatrix, toReversedProjectionMatrix, isTypedArray, ReversedDepthFuncs };

@@ -27,7 +27,7 @@
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>nodeType</strong>
+										<strong translate="no">nodeType</strong>
 									</td>
 									<td class="description last">
 										<p>The node type.</p>
@@ -40,12 +40,26 @@
 				</div>
 				<h2 class="subsection-title">Properties</h2>
 				<div class="member">
+					<h3 class="name" id="assignable" translate="no">.<a href="#assignable">assignable</a><span class="type-signature"> : boolean</span> </h3>
+					<div class="description">
+						<p>Whether this node can be assigned. It is generated as an expression,
+unless it is assigned, in which case it is declared as a variable where it was created.</p>
+						<p>Default is <code>false</code>.</p>
+					</div>
+				</div>
+				<div class="member">
 					<h3 class="name" id="global" translate="no">.<a href="#global">global</a><span class="type-signature"> : boolean</span> </h3>
 					<div class="description">
 						<p>Whether this node is global or not. This property is relevant for the internal
 node caching system. All nodes which should be declared just once should
 set this flag to <code>true</code> (a typical example is <a href="AttributeNode.html">AttributeNode</a>).</p>
 						<p>Default is <code>false</code>.</p>
+					</div>
+				</div>
+				<div class="member">
+					<h3 class="name" id="id" translate="no">.<a href="#id">id</a><span class="type-signature"> : number</span> <span class="type-signature">(readonly) </span></h3>
+					<div class="description">
+						<p>The unique ID of the node.</p>
 					</div>
 				</div>
 				<div class="member">
@@ -81,6 +95,13 @@ set this flag to <code>true</code> (a typical example is <a href="AttributeNode.
 					<div class="description">
 						<p>Create a list of parents for this node during the build process.</p>
 						<p>Default is <code>false</code>.</p>
+					</div>
+				</div>
+				<div class="member">
+					<h3 class="name" id="stackTrace" translate="no">.<a href="#stackTrace">stackTrace</a><span class="type-signature"> : string</span> </h3>
+					<div class="description">
+						<p>The stack trace of the node for debugging purposes.</p>
+						<p>Default is <code>null</code>.</p>
 					</div>
 				</div>
 				<div class="member">
@@ -123,6 +144,14 @@ set this flag to <code>true</code> (a typical example is <a href="AttributeNode.
 						<p>Default is <code>0</code>.</p>
 					</div>
 				</div>
+				<h2 class="subsection-title">Static Properties</h2>
+				<div class="member">
+					<h3 class="name" id=".captureStackTrace" translate="no">.<a href="#.captureStackTrace">captureStackTrace</a><span class="type-signature"> : boolean</span> </h3>
+					<div class="description">
+						<p>Enables or disables the automatic capturing of stack traces for nodes.</p>
+						<p>Default is <code>false</code>.</p>
+					</div>
+				</div>
 				<h2 class="subsection-title">Methods</h2>
 					<h3 class="name name-method" id="analyze" translate="no">.<a href="#analyze">analyze</a><span class="signature">( builder : <span class="param-type"><a href="NodeBuilder.html">NodeBuilder</a></span>, output : <span class="param-type"><a href="Node.html">Node</a></span> )</span> </h3>
 					<div class="method">
@@ -134,7 +163,7 @@ This stage analyzes the node hierarchy and ensures descendent nodes are built.</
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>The current node builder.</p>
@@ -142,7 +171,7 @@ This stage analyzes the node hierarchy and ensures descendent nodes are built.</
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>output</strong>
+										<strong translate="no">output</strong>
 									</td>
 									<td class="description last">
 										<p>The target output node.</p>
@@ -166,7 +195,7 @@ This stage analyzes the node hierarchy and ensures descendent nodes are built.</
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>The current node builder.</p>
@@ -174,7 +203,7 @@ This stage analyzes the node hierarchy and ensures descendent nodes are built.</
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>output</strong>
+										<strong translate="no">output</strong>
 									</td>
 									<td class="description last">
 										<p>Can be used to define the output type.</p>
@@ -205,7 +234,7 @@ This stage analyzes the node hierarchy and ensures descendent nodes are built.</
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>json</strong>
+										<strong translate="no">json</strong>
 									</td>
 									<td class="description last">
 										<p>The JSON object.</p>
@@ -231,7 +260,7 @@ This state builds the output node and returns the resulting shader string.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>The current node builder.</p>
@@ -239,7 +268,7 @@ This state builds the output node and returns the resulting shader string.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>output</strong>
+										<strong translate="no">output</strong>
 									</td>
 									<td class="description last">
 										<p>Can be used to define the output type.</p>
@@ -251,6 +280,36 @@ This state builds the output node and returns the resulting shader string.</p>
 							<dt class="tag-returns"><strong>Returns:</strong> The generated shader string.</dt>
 						</dl>
 					</div>
+					<h3 class="name name-method" id="generateNodeType" translate="no">.<a href="#generateNodeType">generateNodeType</a><span class="signature">( builder : <span class="param-type"><a href="NodeBuilder.html">NodeBuilder</a></span>, output : <span class="param-type">string</span> )</span><span class="type-signature"> : string</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns the node's type.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">builder</strong>
+									</td>
+									<td class="description last">
+										<p>The current node builder.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">output</strong>
+									</td>
+									<td class="description last">
+										<p>The output of the node.</p>
+										<p>Default is <code>null</code>.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The type of the node.</dt>
+						</dl>
+					</div>
 					<h3 class="name name-method" id="getArrayCount" translate="no">.<a href="#getArrayCount">getArrayCount</a><span class="signature">( builder : <span class="param-type"><a href="NodeBuilder.html">NodeBuilder</a></span> )</span><span class="type-signature"> : number</span> </h3>
 					<div class="method">
 						<div class="description">
@@ -260,7 +319,7 @@ This state builds the output node and returns the resulting shader string.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>The current node builder.</p>
@@ -281,7 +340,7 @@ This state builds the output node and returns the resulting shader string.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>force</strong>
+										<strong translate="no">force</strong>
 									</td>
 									<td class="description last">
 										<p>When set to <code>true</code>, a recomputation of the cache key is forced.</p>
@@ -290,7 +349,7 @@ This state builds the output node and returns the resulting shader string.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>ignores</strong>
+										<strong translate="no">ignores</strong>
 									</td>
 									<td class="description last">
 										<p>A set of nodes to ignore during the computation of the cache key.</p>
@@ -303,13 +362,14 @@ This state builds the output node and returns the resulting shader string.</p>
 							<dt class="tag-returns"><strong>Returns:</strong> The cache key of the node.</dt>
 						</dl>
 					</div>
-					<h3 class="name name-method" id="getChildren" translate="no">.<a href="#getChildren">getChildren</a><span class="signature">()</span><span class="type-signature"> : <a href="Node.html">Node</a></span> <span class="type-signature">(generator) </span></h3>
+					<h3 class="name name-method" id="getChildren" translate="no">.<a href="#getChildren">getChildren</a><span class="signature">()</span><span class="type-signature"> : Array.&lt;<a href="Node.html">Node</a>></span> </h3>
 					<div class="method">
 						<div class="description">
-							<p>Generator function that can be used to iterate over the child nodes.</p>
+							<p>Returns the child nodes of this node.</p>
 						</div>
-						<h5>Yields:</h5>
-							A child node.
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The child nodes.</dt>
+						</dl>
 					</div>
 					<h3 class="name name-method" id="getElementType" translate="no">.<a href="#getElementType">getElementType</a><span class="signature">( builder : <span class="param-type"><a href="NodeBuilder.html">NodeBuilder</a></span> )</span><span class="type-signature"> : string</span> </h3>
 					<div class="method">
@@ -322,7 +382,7 @@ these elements.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>The current node builder.</p>
@@ -345,7 +405,7 @@ depending on their implementation.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>The current node builder.</p>
@@ -366,7 +426,7 @@ depending on their implementation.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>The current node builder.</p>
@@ -374,7 +434,7 @@ depending on their implementation.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>name</strong>
+										<strong translate="no">name</strong>
 									</td>
 									<td class="description last">
 										<p>The name of the member.</p>
@@ -386,7 +446,7 @@ depending on their implementation.</p>
 							<dt class="tag-returns"><strong>Returns:</strong> The type of the node.</dt>
 						</dl>
 					</div>
-					<h3 class="name name-method" id="getNodeType" translate="no">.<a href="#getNodeType">getNodeType</a><span class="signature">( builder : <span class="param-type"><a href="NodeBuilder.html">NodeBuilder</a></span> )</span><span class="type-signature"> : string</span> </h3>
+					<h3 class="name name-method" id="getNodeType" translate="no">.<a href="#getNodeType">getNodeType</a><span class="signature">( builder : <span class="param-type"><a href="NodeBuilder.html">NodeBuilder</a></span>, output : <span class="param-type">string</span> )</span><span class="type-signature"> : string</span> </h3>
 					<div class="method">
 						<div class="description">
 							<p>Returns the node's type.</p>
@@ -395,10 +455,19 @@ depending on their implementation.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>The current node builder.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">output</strong>
+									</td>
+									<td class="description last">
+										<p>The output of the node.</p>
+										<p>Default is <code>null</code>.</p>
 									</td>
 								</tr>
 							</tbody>
@@ -431,13 +500,14 @@ depending on their implementation.</p>
 							<p>This method is used during the build process of a node and ensures
 equal nodes are not built multiple times but just once. For example if
 <code>attribute( 'uv' )</code> is used multiple times by the user, the build
-process makes sure to process just the first node.</p>
+process makes sure to process just the first node. It also handles
+node overrides if an override context is set.</p>
 						</div>
 						<table class="params">
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>The current node builder.</p>
@@ -449,31 +519,131 @@ process makes sure to process just the first node.</p>
 							<dt class="tag-returns"><strong>Returns:</strong> The shared node if possible. Otherwise <code>this</code> is returned.</dt>
 						</dl>
 					</div>
-					<h3 class="name name-method" id="getUpdateAfterType" translate="no">.<a href="#getUpdateAfterType">getUpdateAfterType</a><span class="signature">()</span><span class="type-signature"> : <a href="global.html#NodeUpdateType">NodeUpdateType</a></span> </h3>
+					<h3 class="name name-method" id="getUpdateAfterType" translate="no">.<a href="#getUpdateAfterType">getUpdateAfterType</a><span class="signature">( frame : <span class="param-type"><a href="NodeFrame.html">NodeFrame</a></span> )</span><span class="type-signature"> : <a href="global.html#NodeUpdateType">NodeUpdateType</a></span> </h3>
 					<div class="method">
 						<div class="description">
 							<p>Returns the update type of <a href="Node.html#updateAfter">Node#updateAfter</a>.</p>
 						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">frame</strong>
+									</td>
+									<td class="description last">
+										<p>The current node frame.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
 						<dl class="details">
 							<dt class="tag-returns"><strong>Returns:</strong> The update type.</dt>
 						</dl>
 					</div>
-					<h3 class="name name-method" id="getUpdateBeforeType" translate="no">.<a href="#getUpdateBeforeType">getUpdateBeforeType</a><span class="signature">()</span><span class="type-signature"> : <a href="global.html#NodeUpdateType">NodeUpdateType</a></span> </h3>
+					<h3 class="name name-method" id="getUpdateBeforeType" translate="no">.<a href="#getUpdateBeforeType">getUpdateBeforeType</a><span class="signature">( frame : <span class="param-type"><a href="NodeFrame.html">NodeFrame</a></span> )</span><span class="type-signature"> : <a href="global.html#NodeUpdateType">NodeUpdateType</a></span> </h3>
 					<div class="method">
 						<div class="description">
 							<p>Returns the update type of <a href="Node.html#updateBefore">Node#updateBefore</a>.</p>
 						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">frame</strong>
+									</td>
+									<td class="description last">
+										<p>The current node frame.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
 						<dl class="details">
 							<dt class="tag-returns"><strong>Returns:</strong> The update type.</dt>
 						</dl>
 					</div>
-					<h3 class="name name-method" id="getUpdateType" translate="no">.<a href="#getUpdateType">getUpdateType</a><span class="signature">()</span><span class="type-signature"> : <a href="global.html#NodeUpdateType">NodeUpdateType</a></span> </h3>
+					<h3 class="name name-method" id="getUpdateType" translate="no">.<a href="#getUpdateType">getUpdateType</a><span class="signature">( frame : <span class="param-type"><a href="NodeFrame.html">NodeFrame</a></span> )</span><span class="type-signature"> : <a href="global.html#NodeUpdateType">NodeUpdateType</a></span> </h3>
 					<div class="method">
 						<div class="description">
 							<p>Returns the update type of <a href="Node.html#update">Node#update</a>.</p>
 						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">frame</strong>
+									</td>
+									<td class="description last">
+										<p>The current node frame.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
 						<dl class="details">
 							<dt class="tag-returns"><strong>Returns:</strong> The update type.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="isAssign" translate="no">.<a href="#isAssign">isAssign</a><span class="signature">( builder : <span class="param-type"><a href="NodeBuilder.html">NodeBuilder</a></span> )</span><span class="type-signature"> : boolean</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Checks if this node is the target of an assignment.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">builder</strong>
+									</td>
+									<td class="description last">
+										<p>The node builder.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> Whether this node is assigned.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="isAssignable" translate="no">.<a href="#isAssignable">isAssignable</a><span class="signature">( builder : <span class="param-type"><a href="NodeBuilder.html">NodeBuilder</a></span> )</span><span class="type-signature"> : boolean</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Checks if this node is assignable without a forced declaration.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">builder</strong>
+									</td>
+									<td class="description last">
+										<p>The node builder.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> Whether this node is assignable without a forced declaration.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="isCacheable" translate="no">.<a href="#isCacheable">isCacheable</a><span class="signature">( builder : <span class="param-type"><a href="NodeBuilder.html">NodeBuilder</a></span> )</span><span class="type-signature"> : boolean</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Whether this node allows caching its result in a temporary variable.
+Caching is enabled by default. Override this method to disable it.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">builder</strong>
+									</td>
+									<td class="description last">
+										<p>The current node builder.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> Whether temporary caching is allowed.</dt>
 						</dl>
 					</div>
 					<h3 class="name name-method" id="isGlobal" translate="no">.<a href="#isGlobal">isGlobal</a><span class="signature">( builder : <span class="param-type"><a href="NodeBuilder.html">NodeBuilder</a></span> )</span><span class="type-signature"> : boolean</span> </h3>
@@ -487,7 +657,7 @@ global cache referring to the current shader-stage.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>The current node builder.</p>
@@ -509,7 +679,7 @@ this method automatically sets the update type to <code>FRAME</code>.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>callback</strong>
+										<strong translate="no">callback</strong>
 									</td>
 									<td class="description last">
 										<p>The update method.</p>
@@ -531,7 +701,7 @@ this method automatically sets the update type to <code>OBJECT</code>.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>callback</strong>
+										<strong translate="no">callback</strong>
 									</td>
 									<td class="description last">
 										<p>The update method.</p>
@@ -552,7 +722,7 @@ this method automatically sets the update type to <code>OBJECT</code>.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>callback</strong>
+										<strong translate="no">callback</strong>
 									</td>
 									<td class="description last">
 										<p>The update method.</p>
@@ -574,7 +744,7 @@ this method automatically sets the update type to <code>RENDER</code>.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>callback</strong>
+										<strong translate="no">callback</strong>
 									</td>
 									<td class="description last">
 										<p>The update method.</p>
@@ -595,7 +765,7 @@ this method automatically sets the update type to <code>RENDER</code>.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>callback</strong>
+										<strong translate="no">callback</strong>
 									</td>
 									<td class="description last">
 										<p>The update method.</p>
@@ -603,7 +773,7 @@ this method automatically sets the update type to <code>RENDER</code>.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>updateType</strong>
+										<strong translate="no">updateType</strong>
 									</td>
 									<td class="description last">
 										<p>The update type.</p>
@@ -624,7 +794,7 @@ this method automatically sets the update type to <code>RENDER</code>.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>json</strong>
+										<strong translate="no">json</strong>
 									</td>
 									<td class="description last">
 										<p>The output JSON object.</p>
@@ -644,7 +814,7 @@ If an output node is prepared, then it must be returned in the <code>return</cod
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>The current node builder.</p>
@@ -656,6 +826,17 @@ If an output node is prepared, then it must be returned in the <code>return</cod
 							<dt class="tag-returns"><strong>Returns:</strong> The output node.</dt>
 						</dl>
 					</div>
+					<h3 class="name name-method" id="toAssignable" translate="no">.<a href="#toAssignable">toAssignable</a><span class="signature">()</span><span class="type-signature"> : <a href="Node.html">Node</a></span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Makes this node assignable and adds it to the current stack,
+so it can be declared where it was created if it is assigned later.
+Only use it with nodes that are not shared, see <a href="Node.html#assignable">Node#assignable</a>.</p>
+						</div>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> A reference to this node.</dt>
+						</dl>
+					</div>
 					<h3 class="name name-method" id="toJSON" translate="no">.<a href="#toJSON">toJSON</a><span class="signature">( meta : <span class="param-type">Object</span> )</span><span class="type-signature"> : Object</span> </h3>
 					<div class="method">
 						<div class="description">
@@ -665,7 +846,7 @@ If an output node is prepared, then it must be returned in the <code>return</cod
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>meta</strong>
+										<strong translate="no">meta</strong>
 									</td>
 									<td class="description last">
 										<p>An optional JSON object that already holds serialized data from other scene objects.</p>
@@ -686,7 +867,7 @@ If an output node is prepared, then it must be returned in the <code>return</cod
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>callback</strong>
+										<strong translate="no">callback</strong>
 									</td>
 									<td class="description last">
 										<p>A callback that is executed per node.</p>
@@ -705,7 +886,7 @@ The <a href="Node.html#updateType">Node#updateType</a> property defines how ofte
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>frame</strong>
+										<strong translate="no">frame</strong>
 									</td>
 									<td class="description last">
 										<p>A reference to the current node frame.</p>
@@ -727,7 +908,7 @@ The <a href="Node.html#updateAfterType">Node#updateAfterType</a> property define
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>frame</strong>
+										<strong translate="no">frame</strong>
 									</td>
 									<td class="description last">
 										<p>A reference to the current node frame.</p>
@@ -749,7 +930,7 @@ The <a href="Node.html#updateBeforeType">Node#updateBeforeType</a> property defi
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>frame</strong>
+										<strong translate="no">frame</strong>
 									</td>
 									<td class="description last">
 										<p>A reference to the current node frame.</p>
@@ -771,7 +952,7 @@ to such objects based on a given state (e.g. the current node frame or builder).
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>state</strong>
+										<strong translate="no">state</strong>
 									</td>
 									<td class="description last">
 										<p>This method can be invocated in different contexts so <code>state</code> can refer to any object type.</p>

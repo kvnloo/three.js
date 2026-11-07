@@ -1,8 +1,9 @@
 import { Vector3 } from '../math/Vector3.js';
 import { Vector2 } from '../math/Vector2.js';
-import { denormalize, normalize } from '../math/MathUtils.js';
+import { denormalize, normalize, getNormalizationScale } from '../math/MathUtils.js';
 import { StaticDrawUsage, FloatType } from '../constants.js';
 import { fromHalfFloat, toHalfFloat } from '../extras/DataUtils.js';
+import { EventDispatcher } from './EventDispatcher.js';
 
 const _vector = /*@__PURE__*/ new Vector3();
 const _vector2 = /*@__PURE__*/ new Vector2();
@@ -17,7 +18,7 @@ let _id = 0;
  * When working with vector-like data, the `fromBufferAttribute( attribute, index )`
  * helper methods on vector and color class might be helpful. E.g. {@link Vector3#fromBufferAttribute}.
  */
-class BufferAttribute {
+class BufferAttribute extends EventDispatcher {
 
 	/**
 	 * Constructs a new buffer attribute.
@@ -27,6 +28,8 @@ class BufferAttribute {
 	 * @param {boolean} [normalized=false] - Whether the data are normalized or not.
 	 */
 	constructor( array, itemSize, normalized = false ) {
+
+		super();
 
 		if ( Array.isArray( array ) ) {
 
@@ -133,6 +136,14 @@ class BufferAttribute {
 		 */
 		this.version = 0;
 
+		/**
+		 * Cached normalization factor, see {@link MathUtils#getNormalizationScale}.
+		 *
+		 * @private
+		 * @type {number|undefined}
+		 */
+		this._normalizationScale = array !== undefined ? getNormalizationScale( array ) : undefined;
+
 	}
 
 	/**
@@ -206,6 +217,8 @@ class BufferAttribute {
 
 		this.usage = source.usage;
 		this.gpuType = source.gpuType;
+
+		this._normalizationScale = source._normalizationScale;
 
 		return this;
 
@@ -383,7 +396,7 @@ class BufferAttribute {
 
 		let value = this.array[ index * this.itemSize + component ];
 
-		if ( this.normalized ) value = denormalize( value, this.array );
+		if ( this.normalized ) value = this._denormalize( value );
 
 		return value;
 
@@ -399,7 +412,7 @@ class BufferAttribute {
 	 */
 	setComponent( index, component, value ) {
 
-		if ( this.normalized ) value = normalize( value, this.array );
+		if ( this.normalized ) value = this._normalize( value );
 
 		this.array[ index * this.itemSize + component ] = value;
 
@@ -417,7 +430,7 @@ class BufferAttribute {
 
 		let x = this.array[ index * this.itemSize ];
 
-		if ( this.normalized ) x = denormalize( x, this.array );
+		if ( this.normalized ) x = this._denormalize( x );
 
 		return x;
 
@@ -432,7 +445,7 @@ class BufferAttribute {
 	 */
 	setX( index, x ) {
 
-		if ( this.normalized ) x = normalize( x, this.array );
+		if ( this.normalized ) x = this._normalize( x );
 
 		this.array[ index * this.itemSize ] = x;
 
@@ -450,7 +463,7 @@ class BufferAttribute {
 
 		let y = this.array[ index * this.itemSize + 1 ];
 
-		if ( this.normalized ) y = denormalize( y, this.array );
+		if ( this.normalized ) y = this._denormalize( y );
 
 		return y;
 
@@ -465,7 +478,7 @@ class BufferAttribute {
 	 */
 	setY( index, y ) {
 
-		if ( this.normalized ) y = normalize( y, this.array );
+		if ( this.normalized ) y = this._normalize( y );
 
 		this.array[ index * this.itemSize + 1 ] = y;
 
@@ -483,7 +496,7 @@ class BufferAttribute {
 
 		let z = this.array[ index * this.itemSize + 2 ];
 
-		if ( this.normalized ) z = denormalize( z, this.array );
+		if ( this.normalized ) z = this._denormalize( z );
 
 		return z;
 
@@ -498,7 +511,7 @@ class BufferAttribute {
 	 */
 	setZ( index, z ) {
 
-		if ( this.normalized ) z = normalize( z, this.array );
+		if ( this.normalized ) z = this._normalize( z );
 
 		this.array[ index * this.itemSize + 2 ] = z;
 
@@ -516,7 +529,7 @@ class BufferAttribute {
 
 		let w = this.array[ index * this.itemSize + 3 ];
 
-		if ( this.normalized ) w = denormalize( w, this.array );
+		if ( this.normalized ) w = this._denormalize( w );
 
 		return w;
 
@@ -531,7 +544,7 @@ class BufferAttribute {
 	 */
 	setW( index, w ) {
 
-		if ( this.normalized ) w = normalize( w, this.array );
+		if ( this.normalized ) w = this._normalize( w );
 
 		this.array[ index * this.itemSize + 3 ] = w;
 
@@ -553,8 +566,8 @@ class BufferAttribute {
 
 		if ( this.normalized ) {
 
-			x = normalize( x, this.array );
-			y = normalize( y, this.array );
+			x = this._normalize( x );
+			y = this._normalize( y );
 
 		}
 
@@ -580,9 +593,9 @@ class BufferAttribute {
 
 		if ( this.normalized ) {
 
-			x = normalize( x, this.array );
-			y = normalize( y, this.array );
-			z = normalize( z, this.array );
+			x = this._normalize( x );
+			y = this._normalize( y );
+			z = this._normalize( z );
 
 		}
 
@@ -610,10 +623,10 @@ class BufferAttribute {
 
 		if ( this.normalized ) {
 
-			x = normalize( x, this.array );
-			y = normalize( y, this.array );
-			z = normalize( z, this.array );
-			w = normalize( w, this.array );
+			x = this._normalize( x );
+			y = this._normalize( y );
+			z = this._normalize( z );
+			w = this._normalize( w );
 
 		}
 
@@ -667,10 +680,46 @@ class BufferAttribute {
 			normalized: this.normalized
 		};
 
-		if ( this.name !== '' ) data.name = this.name;
-		if ( this.usage !== StaticDrawUsage ) data.usage = this.usage;
+		data.name = this.name;
+		data.usage = this.usage;
+		data.gpuType = this.gpuType;
 
 		return data;
+
+	}
+
+	/**
+	 * Frees the GPU-related resources allocated by this instance. Available only in {@link WebGPURenderer}.
+	 */
+	dispose() {
+
+		this.dispatchEvent( { type: 'dispose' } );
+
+	}
+
+	/**
+	 * Denormalizes the value using cached normalization factor.
+	 *
+	 * @private
+	 */
+	_denormalize( value ) {
+
+		const scale = this._normalizationScale;
+
+		return scale !== undefined ? Math.max( value / scale, - 1.0 ) : denormalize( value, this.array );
+
+	}
+
+	/**
+	 * Normalizes the value using cached normalization factor.
+	 *
+	 * @private
+	 */
+	_normalize( value ) {
+
+		const scale = this._normalizationScale;
+
+		return scale !== undefined ? Math.round( value * scale ) : normalize( value, this.array );
 
 	}
 

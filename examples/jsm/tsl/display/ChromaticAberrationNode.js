@@ -1,13 +1,11 @@
-import { Vector2, TempNode } from 'three/webgpu';
+import { Node } from 'three/webgpu';
 import {
 	nodeObject,
 	Fn,
-	uniform,
 	convertToTexture,
 	float,
 	vec4,
 	uv,
-	NodeUpdateType,
 } from 'three/tsl';
 
 /**
@@ -15,10 +13,10 @@ import {
  * This effect simulates the color fringing that occurs in real camera lenses
  * by separating and offsetting the red, green, and blue channels.
  *
- * @augments TempNode
+ * @augments Node
  * @three_import import { chromaticAberration } from 'three/addons/tsl/display/ChromaticAberrationNode.js';
  */
-class ChromaticAberrationNode extends TempNode {
+class ChromaticAberrationNode extends Node {
 
 	static get type() {
 
@@ -46,15 +44,6 @@ class ChromaticAberrationNode extends TempNode {
 		this.textureNode = textureNode;
 
 		/**
-		 * The `updateBeforeType` is set to `NodeUpdateType.FRAME` since the node updates
-		 * its internal uniforms once per frame in `updateBefore()`.
-		 *
-		 * @type {string}
-		 * @default 'frame'
-		 */
-		this.updateBeforeType = NodeUpdateType.FRAME;
-
-		/**
 		 * A node holding the strength of the effect.
 		 *
 		 * @type {Node}
@@ -74,26 +63,6 @@ class ChromaticAberrationNode extends TempNode {
 		 * @type {Node}
 		 */
 		this.scaleNode = scaleNode;
-
-		/**
-		 * A uniform node holding the inverse resolution value.
-		 *
-		 * @private
-		 * @type {UniformNode<vec2>}
-		 */
-		this._invSize = uniform( new Vector2() );
-
-	}
-
-	/**
-	 * This method is used to update the effect's uniforms once per frame.
-	 *
-	 * @param {NodeFrame} frame - The current node frame.
-	 */
-	updateBefore( /* frame */ ) {
-
-		const map = this.textureNode.value;
-		this._invSize.value.set( 1 / map.image.width, 1 / map.image.height );
 
 	}
 
@@ -148,16 +117,6 @@ class ChromaticAberrationNode extends TempNode {
 
 			return vec4( r, g, b, a );
 
-		} ).setLayout( {
-			name: 'ChromaticAberrationShader',
-			type: 'vec4',
-			inputs: [
-				{ name: 'uv', type: 'vec2' },
-				{ name: 'strength', type: 'float' },
-				{ name: 'center', type: 'vec2' },
-				{ name: 'scale', type: 'float' },
-				{ name: 'invSize', type: 'vec2' }
-			]
 		} );
 
 		const chromaticAberrationFn = Fn( () => {
@@ -166,8 +125,7 @@ class ChromaticAberrationNode extends TempNode {
 				uvNode,
 				this.strengthNode,
 				this.centerNode,
-				this.scaleNode,
-				this._invSize
+				this.scaleNode
 			);
 
 		} );
@@ -195,13 +153,11 @@ export default ChromaticAberrationNode;
  */
 export const chromaticAberration = ( node, strength = 1.0, center = null, scale = 1.1 ) => {
 
-	return nodeObject(
-		new ChromaticAberrationNode(
-			convertToTexture( node ),
-			nodeObject( strength ),
-			nodeObject( center ),
-			nodeObject( scale )
-		)
+	return new ChromaticAberrationNode(
+		convertToTexture( node ),
+		nodeObject( strength ),
+		nodeObject( center ),
+		nodeObject( scale )
 	);
 
 };

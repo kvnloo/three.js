@@ -27,7 +27,7 @@ on a 3D object and its node material definition.</p></div>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>object</strong>
+										<strong translate="no">object</strong>
 									</td>
 									<td class="description last">
 										<p>The 3D object.</p>
@@ -35,7 +35,7 @@ on a 3D object and its node material definition.</p></div>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>renderer</strong>
+										<strong translate="no">renderer</strong>
 									</td>
 									<td class="description last">
 										<p>The current renderer.</p>
@@ -43,7 +43,7 @@ on a 3D object and its node material definition.</p></div>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>parser</strong>
+										<strong translate="no">parser</strong>
 									</td>
 									<td class="description last">
 										<p>A reference to a node parser.</p>
@@ -132,6 +132,13 @@ The codes are maintained in an array for each shader stage.</p>
 					</div>
 				</div>
 				<div class="member">
+					<h3 class="name" id="compute" translate="no">.<a href="#compute">compute</a><span class="type-signature"> : <a href="ComputeNode.html">ComputeNode</a></span> </h3>
+					<div class="description">
+						<p>The compute node, if building for compute.</p>
+						<p>Default is <code>null</code>.</p>
+					</div>
+				</div>
+				<div class="member">
 					<h3 class="name" id="computeShader" translate="no">.<a href="#computeShader">computeShader</a><span class="type-signature"> : string</span> </h3>
 					<div class="description">
 						<p>The generated compute shader.</p>
@@ -175,6 +182,14 @@ last node in the chain of nodes.</p>
 					<div class="description">
 						<p>Current code flow.
 All code generated in this stack will be stored in <code>.flow</code>.</p>
+					</div>
+				</div>
+				<div class="member">
+					<h3 class="name" id="flowBlock" translate="no">.<a href="#flowBlock">flowBlock</a><span class="type-signature"> : Object</span> </h3>
+					<div class="description">
+						<p>The block of generated code the builder is in, e.g. a loop body or a conditional branch.
+Every generated block is a new object linked to its parent, <code>null</code> outside of any block.</p>
+						<p>Default is <code>null</code>.</p>
 					</div>
 				</div>
 				<div class="member">
@@ -225,6 +240,13 @@ to the builder's own cache.</p>
 					</div>
 				</div>
 				<div class="member">
+					<h3 class="name" id="hardwareClipping" translate="no">.<a href="#hardwareClipping">hardwareClipping</a><span class="type-signature"> : boolean</span> </h3>
+					<div class="description">
+						<p>Whether the built material uses hardware clipping or not.</p>
+						<p>Default is <code>false</code>.</p>
+					</div>
+				</div>
+				<div class="member">
 					<h3 class="name" id="hashNodes" translate="no">.<a href="#hashNodes">hashNodes</a><span class="type-signature"> : Object.&lt;number, <a href="Node.html">Node</a>></span> </h3>
 					<div class="description">
 						<p>A dictionary that assigns each node to a unique hash.</p>
@@ -244,7 +266,7 @@ to the builder's own cache.</p>
 					</div>
 				</div>
 				<div class="member">
-					<h3 class="name" id="nodes" translate="no">.<a href="#nodes">nodes</a><span class="type-signature"> : Array.&lt;<a href="Node.html">Node</a>></span> </h3>
+					<h3 class="name" id="nodes" translate="no">.<a href="#nodes">nodes</a><span class="type-signature"> : Set.&lt;<a href="Node.html">Node</a>></span> </h3>
 					<div class="description">
 						<p>A list of all nodes the builder is processing
 for this 3D object.</p>
@@ -254,6 +276,15 @@ for this 3D object.</p>
 					<h3 class="name" id="object" translate="no">.<a href="#object">object</a><span class="type-signature"> : <a href="Object3D.html">Object3D</a></span> </h3>
 					<div class="description">
 						<p>The 3D object.</p>
+					</div>
+				</div>
+				<div class="member">
+					<h3 class="name" id="objectSpecific" translate="no">.<a href="#objectSpecific">objectSpecific</a><span class="type-signature"> : boolean</span> </h3>
+					<div class="description">
+						<p>Whether the build embeds data of the 3D object it is built for, like its buffers,
+instead of binding the data of the rendered object. Such builds can't be shared
+with other objects, so the renderer doesn't cache them.</p>
+						<p>Default is <code>false</code>.</p>
 					</div>
 				</div>
 				<div class="member">
@@ -270,6 +301,12 @@ for this 3D object.</p>
 					</div>
 				</div>
 				<div class="member">
+					<h3 class="name" id="renderPipeline" translate="no">.<a href="#renderPipeline">renderPipeline</a><span class="type-signature"> : <a href="RenderPipeline.html">RenderPipeline</a></span> </h3>
+					<div class="description">
+						<p>A reference to the render pipeline.</p>
+					</div>
+				</div>
+				<div class="member">
 					<h3 class="name" id="renderer" translate="no">.<a href="#renderer">renderer</a><span class="type-signature"> : <a href="Renderer.html">Renderer</a></span> </h3>
 					<div class="description">
 						<p>The current renderer.</p>
@@ -283,9 +320,11 @@ for this 3D object.</p>
 					</div>
 				</div>
 				<div class="member">
-					<h3 class="name" id="sequentialNodes" translate="no">.<a href="#sequentialNodes">sequentialNodes</a><span class="type-signature"> : Array.&lt;<a href="Node.html">Node</a>></span> </h3>
+					<h3 class="name" id="sequentialNodes" translate="no">.<a href="#sequentialNodes">sequentialNodes</a><span class="type-signature"> : Set.&lt;<a href="Node.html">Node</a>></span> </h3>
 					<div class="description">
-						<p>A list of all sequential nodes.</p>
+						<p>A list of all nodes the builder is processing in sequential order.</p>
+<p>This is used to determine the update order of nodes, which is important for
+NodeUpdateType#UPDATE_BEFORE and NodeUpdateType#UPDATE_AFTER.</p>
 					</div>
 				</div>
 				<div class="member">
@@ -406,7 +445,7 @@ This is used to check recursive calls in node-graph.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to add.</p>
@@ -424,7 +463,7 @@ This is used to check recursive calls in node-graph.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>context</strong>
+										<strong translate="no">context</strong>
 									</td>
 									<td class="description last">
 										<p>The context to add.</p>
@@ -445,7 +484,7 @@ This is used to check recursive calls in node-graph.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -453,7 +492,7 @@ This is used to check recursive calls in node-graph.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to add.</p>
@@ -474,7 +513,7 @@ This is used to check recursive calls in node-graph.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>code</strong>
+										<strong translate="no">code</strong>
 									</td>
 									<td class="description last">
 										<p>Shader code.</p>
@@ -485,34 +524,6 @@ This is used to check recursive calls in node-graph.</p>
 						<dl class="details">
 							<dt class="tag-returns"><strong>Returns:</strong> A reference to this node builder.</dt>
 						</dl>
-					</div>
-					<h3 class="name name-method" id="addFlowCodeHierarchy" translate="no">.<a href="#addFlowCodeHierarchy">addFlowCodeHierarchy</a><span class="signature">( node : <span class="param-type"><a href="Node.html">Node</a></span>, nodeBlock : <span class="param-type"><a href="Node.html">Node</a></span> )</span> </h3>
-					<div class="method">
-						<div class="description">
-							<p>Adds a code flow based on the code-block hierarchy.
-This is used so that code-blocks like If,Else create their variables locally if the Node
-is only used inside one of these conditionals in the current shader stage.</p>
-						</div>
-						<table class="params">
-							<tbody>
-								<tr>
-									<td class="name">
-										<strong>node</strong>
-									</td>
-									<td class="description last">
-										<p>The node to add.</p>
-									</td>
-								</tr>
-								<tr>
-									<td class="name">
-										<strong>nodeBlock</strong>
-									</td>
-									<td class="description last">
-										<p>Node-based code-block. Usually 'ConditionalNode'.</p>
-									</td>
-								</tr>
-							</tbody>
-						</table>
 					</div>
 					<h3 class="name name-method" id="addFlowTab" translate="no">.<a href="#addFlowTab">addFlowTab</a><span class="signature">()</span><span class="type-signature"> : <a href="NodeBuilder.html">NodeBuilder</a></span> </h3>
 					<div class="method">
@@ -533,7 +544,7 @@ Typically used in codes with If,Else.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to include.</p>
@@ -551,7 +562,7 @@ Typically used in codes with If,Else.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>code</strong>
+										<strong translate="no">code</strong>
 									</td>
 									<td class="description last">
 										<p>The code to add.</p>
@@ -559,10 +570,10 @@ Typically used in codes with If,Else.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
-										<p>Optional Node, can help the system understand if the Node is part of a code-block.</p>
+										<p>The node that generated the code.</p>
 										<p>Default is <code>null</code>.</p>
 									</td>
 								</tr>
@@ -571,40 +582,6 @@ Typically used in codes with If,Else.</p>
 						<dl class="details">
 							<dt class="tag-returns"><strong>Returns:</strong> A reference to this node builder.</dt>
 						</dl>
-					</div>
-					<h3 class="name name-method" id="addLineFlowCodeBlock" translate="no">.<a href="#addLineFlowCodeBlock">addLineFlowCodeBlock</a><span class="signature">( node : <span class="param-type"><a href="Node.html">Node</a></span>, code : <span class="param-type">string</span>, nodeBlock : <span class="param-type"><a href="Node.html">Node</a></span> )</span> </h3>
-					<div class="method">
-						<div class="description">
-							<p>Add a inline-code to the current flow code-block.</p>
-						</div>
-						<table class="params">
-							<tbody>
-								<tr>
-									<td class="name">
-										<strong>node</strong>
-									</td>
-									<td class="description last">
-										<p>The node to add.</p>
-									</td>
-								</tr>
-								<tr>
-									<td class="name">
-										<strong>code</strong>
-									</td>
-									<td class="description last">
-										<p>The code to add.</p>
-									</td>
-								</tr>
-								<tr>
-									<td class="name">
-										<strong>nodeBlock</strong>
-									</td>
-									<td class="description last">
-										<p>Current ConditionalNode</p>
-									</td>
-								</tr>
-							</tbody>
-						</table>
 					</div>
 					<h3 class="name name-method" id="addNode" translate="no">.<a href="#addNode">addNode</a><span class="signature">( node : <span class="param-type"><a href="Node.html">Node</a></span> )</span> </h3>
 					<div class="method">
@@ -615,7 +592,7 @@ Typically used in codes with If,Else.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to add.</p>
@@ -635,7 +612,7 @@ This function should be called after 'setup()' in the 'build()' process to ensur
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to add.</p>
@@ -662,7 +639,7 @@ This function should be called after 'setup()' in the 'build()' process to ensur
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>subBuild</strong>
+										<strong translate="no">subBuild</strong>
 									</td>
 									<td class="description last">
 										<p>The sub-build layer to add.</p>
@@ -680,6 +657,29 @@ This function should be called after 'setup()' in the 'build()' process to ensur
 							<dt class="tag-returns"><strong>Returns:</strong> A reference to this node builder.</dt>
 						</dl>
 					</div>
+					<h3 class="name name-method" id="buildAsync" translate="no">.<a href="#buildAsync">buildAsync</a><span class="signature">( yieldFn : <span class="param-type">function</span> )</span><span class="type-signature"> : Promise.&lt;<a href="NodeBuilder.html">NodeBuilder</a>></span> <span class="type-signature">(async) </span></h3>
+					<div class="method">
+						<div class="description">
+							<p>Async version of build() that yields to main thread between shader stages.
+Use this in compileAsync() to prevent blocking the main thread.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">yieldFn</strong>
+									</td>
+									<td class="description last">
+										<p>The function used to yield to the main thread.</p>
+										<p>Default is <code>yieldToMain</code>.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> A promise that resolves to this node builder.</dt>
+						</dl>
+					</div>
 					<h3 class="name name-method" id="buildCode" translate="no">.<a href="#buildCode">buildCode</a><span class="signature">()</span> <span class="type-signature">(abstract) </span></h3>
 					<div class="method">
 						<div class="description">
@@ -695,7 +695,7 @@ This function should be called after 'setup()' in the 'build()' process to ensur
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>shaderNode</strong>
+										<strong translate="no">shaderNode</strong>
 									</td>
 									<td class="description last">
 										<p>The shader node.</p>
@@ -717,7 +717,7 @@ It is a similar type of method like <a href="NodeBuilder.html#getMethod">NodeBui
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>shaderNode</strong>
+										<strong translate="no">shaderNode</strong>
 									</td>
 									<td class="description last">
 										<p>The shader node to build the function node with.</p>
@@ -746,7 +746,7 @@ given value. E.g. <code>vec4</code> should be changed to the new component type
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type.</p>
@@ -754,7 +754,7 @@ given value. E.g. <code>vec4</code> should be changed to the new component type
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>newComponentType</strong>
+										<strong translate="no">newComponentType</strong>
 									</td>
 									<td class="description last">
 										<p>The new component type.</p>
@@ -764,6 +764,16 @@ given value. E.g. <code>vec4</code> should be changed to the new component type
 						</table>
 						<dl class="details">
 							<dt class="tag-returns"><strong>Returns:</strong> The new type.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="createBlock" translate="no">.<a href="#createBlock">createBlock</a><span class="signature">()</span><span class="type-signature"> : Object</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Creates a block that repeats its code, e.g. a loop body, used in the current context.
+The block keeps its parent block, the context and its position in the active stack.</p>
+						</div>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The code block.</dt>
 						</dl>
 					</div>
 					<h3 class="name name-method" id="createCubeRenderTarget" translate="no">.<a href="#createCubeRenderTarget">createCubeRenderTarget</a><span class="signature">( size : <span class="param-type">number</span>, options : <span class="param-type">Object</span> )</span><span class="type-signature"> : <a href="CubeRenderTarget.html">CubeRenderTarget</a></span> </h3>
@@ -776,7 +786,7 @@ dimensions and options.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>size</strong>
+										<strong translate="no">size</strong>
 									</td>
 									<td class="description last">
 										<p>The size of the cube render target.</p>
@@ -784,7 +794,7 @@ dimensions and options.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>options</strong>
+										<strong translate="no">options</strong>
 									</td>
 									<td class="description last">
 										<p>The options of the cube render target.</p>
@@ -806,7 +816,7 @@ dimensions and options.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>width</strong>
+										<strong translate="no">width</strong>
 									</td>
 									<td class="description last">
 										<p>The width of the render target.</p>
@@ -814,7 +824,7 @@ dimensions and options.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>height</strong>
+										<strong translate="no">height</strong>
 									</td>
 									<td class="description last">
 										<p>The height of the render target.</p>
@@ -822,7 +832,7 @@ dimensions and options.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>options</strong>
+										<strong translate="no">options</strong>
 									</td>
 									<td class="description last">
 										<p>The options of the render target.</p>
@@ -833,6 +843,47 @@ dimensions and options.</p>
 						<dl class="details">
 							<dt class="tag-returns"><strong>Returns:</strong> The render target.</dt>
 						</dl>
+					</div>
+					<h3 class="name name-method" id="declareBeforeBlock" translate="no">.<a href="#declareBeforeBlock">declareBeforeBlock</a><span class="signature">( node : <span class="param-type"><a href="Node.html">Node</a></span> )</span><span class="type-signature"> : <a href="StackNode.html">StackNode</a> | undefined</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Declares a node outside of the stacks of this build, e.g. created outside of a function, before the outermost
+block that would repeat it, e.g. a loop body. Blocks set up in another build or with context overrides of the
+current one are kept, since the node could have another value in them.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">node</strong>
+									</td>
+									<td class="description last">
+										<p>The node to declare.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The stack where the node was declared.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="enableDualSourceBlending" translate="no">.<a href="#enableDualSourceBlending">enableDualSourceBlending</a><span class="signature">()</span> <span class="type-signature">(abstract) </span></h3>
+					<div class="method">
+						<div class="description">
+							<p>Enables dual source blending.</p>
+						</div>
+					</div>
+					<h3 class="name name-method" id="enableShaderF16" translate="no">.<a href="#enableShaderF16">enableShaderF16</a><span class="signature">()</span> <span class="type-signature">(abstract) </span></h3>
+					<div class="method">
+						<div class="description">
+							<p>Enables 16 bit floats.</p>
+						</div>
+					</div>
+					<h3 class="name name-method" id="enableSubGroups" translate="no">.<a href="#enableSubGroups">enableSubGroups</a><span class="signature">()</span> <span class="type-signature">(abstract) </span></h3>
+					<div class="method">
+						<div class="description">
+							<p>Enables subgroups.</p>
+						</div>
 					</div>
 					<h3 class="name name-method" id="flowBuildStage" translate="no">.<a href="#flowBuildStage">flowBuildStage</a><span class="signature">( node : <span class="param-type"><a href="Node.html">Node</a></span>, buildStage : <span class="param-type">string</span>, output : <span class="param-type"><a href="Node.html">Node</a> | string</span> )</span><span class="type-signature"> : <a href="Node.html">Node</a> | string</span> </h3>
 					<div class="method">
@@ -848,7 +899,7 @@ before the standard build process begins.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to execute.</p>
@@ -856,7 +907,7 @@ before the standard build process begins.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>buildStage</strong>
+										<strong translate="no">buildStage</strong>
 									</td>
 									<td class="description last">
 										<p>The build stage to execute the node in.</p>
@@ -864,7 +915,7 @@ before the standard build process begins.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>output</strong>
+										<strong translate="no">output</strong>
 									</td>
 									<td class="description last">
 										<p>Expected output type. For example 'vec3'.</p>
@@ -886,7 +937,7 @@ before the standard build process begins.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to execute.</p>
@@ -894,7 +945,7 @@ before the standard build process begins.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>output</strong>
+										<strong translate="no">output</strong>
 									</td>
 									<td class="description last">
 										<p>Expected output type. For example 'vec3'.</p>
@@ -916,7 +967,7 @@ before the standard build process begins.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to execute.</p>
@@ -939,7 +990,7 @@ return the value in fragment-stage even if it is being executed in an input frag
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -947,7 +998,7 @@ return the value in fragment-stage even if it is being executed in an input frag
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to execute.</p>
@@ -955,7 +1006,7 @@ return the value in fragment-stage even if it is being executed in an input frag
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>output</strong>
+										<strong translate="no">output</strong>
 									</td>
 									<td class="description last">
 										<p>Expected output type. For example 'vec3'.</p>
@@ -964,7 +1015,7 @@ return the value in fragment-stage even if it is being executed in an input frag
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>propertyName</strong>
+										<strong translate="no">propertyName</strong>
 									</td>
 									<td class="description last">
 										<p>The property name to assign the result.</p>
@@ -986,7 +1037,7 @@ return the value in fragment-stage even if it is being executed in an input frag
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>shaderNode</strong>
+										<strong translate="no">shaderNode</strong>
 									</td>
 									<td class="description last">
 										<p>A function code will be generated based on the input.</p>
@@ -1004,7 +1055,7 @@ return the value in fragment-stage even if it is being executed in an input frag
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to execute.</p>
@@ -1012,7 +1063,7 @@ return the value in fragment-stage even if it is being executed in an input frag
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>output</strong>
+										<strong translate="no">output</strong>
 									</td>
 									<td class="description last">
 										<p>Expected output type. For example 'vec3'.</p>
@@ -1033,7 +1084,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>snippet</strong>
+										<strong translate="no">snippet</strong>
 									</td>
 									<td class="description last">
 										<p>The shader snippet.</p>
@@ -1041,7 +1092,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>fromType</strong>
+										<strong translate="no">fromType</strong>
 									</td>
 									<td class="description last">
 										<p>The source type.</p>
@@ -1049,7 +1100,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>toType</strong>
+										<strong translate="no">toType</strong>
 									</td>
 									<td class="description last">
 										<p>The target type.</p>
@@ -1070,7 +1121,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type.</p>
@@ -1078,7 +1129,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>count</strong>
+										<strong translate="no">count</strong>
 									</td>
 									<td class="description last">
 										<p>The count.</p>
@@ -1086,7 +1137,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>values</strong>
+										<strong translate="no">values</strong>
 									</td>
 									<td class="description last">
 										<p>The default values.</p>
@@ -1108,7 +1159,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type.</p>
@@ -1116,7 +1167,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>count</strong>
+										<strong translate="no">count</strong>
 									</td>
 									<td class="description last">
 										<p>The count.</p>
@@ -1137,7 +1188,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type.</p>
@@ -1145,7 +1196,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>value</strong>
+										<strong translate="no">value</strong>
 									</td>
 									<td class="description last">
 										<p>The value.</p>
@@ -1158,6 +1209,83 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<dt class="tag-returns"><strong>Returns:</strong> The generated value as a shader string.</dt>
 						</dl>
 					</div>
+					<h3 class="name name-method" id="generateConstStatement" translate="no">.<a href="#generateConstStatement">generateConstStatement</a><span class="signature">( type : <span class="param-type">string</span>, name : <span class="param-type">string</span>, count : <span class="param-type">number</span> )</span><span class="type-signature"> : string</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns a single const variable statement as a shader string for the given variable type and name.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">type</strong>
+									</td>
+									<td class="description last">
+										<p>The variable's type.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">name</strong>
+									</td>
+									<td class="description last">
+										<p>The variable's name.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">count</strong>
+									</td>
+									<td class="description last">
+										<p>The array length.</p>
+										<p>Default is <code>null</code>.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The shader string.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="generateLetStatement" translate="no">.<a href="#generateLetStatement">generateLetStatement</a><span class="signature">( type : <span class="param-type">string</span>, name : <span class="param-type">string</span>, count : <span class="param-type">number</span> )</span><span class="type-signature"> : string</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns a runtime read-only variable statement as a shader string.
+Backends without a let declaration use a regular variable declaration.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">type</strong>
+									</td>
+									<td class="description last">
+										<p>The variable's type.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">name</strong>
+									</td>
+									<td class="description last">
+										<p>The variable's name.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">count</strong>
+									</td>
+									<td class="description last">
+										<p>The array length.</p>
+										<p>Default is <code>null</code>.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The shader string.</dt>
+						</dl>
+					</div>
 					<h3 class="name name-method" id="generateStruct" translate="no">.<a href="#generateStruct">generateStruct</a><span class="signature">( type : <span class="param-type">string</span>, membersLayout : <span class="param-type">Array.&lt;Object></span>, values : <span class="param-type">Array.&lt;<a href="Node.html">Node</a>></span> )</span><span class="type-signature"> : string</span> </h3>
 					<div class="method">
 						<div class="description">
@@ -1167,7 +1295,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type.</p>
@@ -1175,7 +1303,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>membersLayout</strong>
+										<strong translate="no">membersLayout</strong>
 									</td>
 									<td class="description last">
 										<p>The count.</p>
@@ -1183,7 +1311,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>values</strong>
+										<strong translate="no">values</strong>
 									</td>
 									<td class="description last">
 										<p>The default values.</p>
@@ -1205,7 +1333,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>texture</strong>
+										<strong translate="no">texture</strong>
 									</td>
 									<td class="description last">
 										<p>The texture.</p>
@@ -1213,7 +1341,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>textureProperty</strong>
+										<strong translate="no">textureProperty</strong>
 									</td>
 									<td class="description last">
 										<p>The texture property name.</p>
@@ -1221,7 +1349,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>uvSnippet</strong>
+										<strong translate="no">uvSnippet</strong>
 									</td>
 									<td class="description last">
 										<p>Snippet defining the texture coordinates.</p>
@@ -1242,7 +1370,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>texture</strong>
+										<strong translate="no">texture</strong>
 									</td>
 									<td class="description last">
 										<p>The texture.</p>
@@ -1250,7 +1378,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>textureProperty</strong>
+										<strong translate="no">textureProperty</strong>
 									</td>
 									<td class="description last">
 										<p>The texture property name.</p>
@@ -1258,7 +1386,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>uvSnippet</strong>
+										<strong translate="no">uvSnippet</strong>
 									</td>
 									<td class="description last">
 										<p>Snippet defining the texture coordinates.</p>
@@ -1266,7 +1394,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>depthSnippet</strong>
+										<strong translate="no">depthSnippet</strong>
 									</td>
 									<td class="description last">
 										<p>Snippet defining the 0-based texture array index to sample.</p>
@@ -1274,7 +1402,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>levelSnippet</strong>
+										<strong translate="no">levelSnippet</strong>
 									</td>
 									<td class="description last">
 										<p>Snippet defining the mip level.</p>
@@ -1284,6 +1412,81 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 						</table>
 						<dl class="details">
 							<dt class="tag-returns"><strong>Returns:</strong> The generated shader string.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="generateTextureSize" translate="no">.<a href="#generateTextureSize">generateTextureSize</a><span class="signature">( texture : <span class="param-type"><a href="Texture.html">Texture</a></span>, textureProperty : <span class="param-type">string</span>, levelSnippet : <span class="param-type">string</span> )</span><span class="type-signature"> : string</span> <span class="type-signature">(abstract) </span></h3>
+					<div class="method">
+						<div class="description">
+							<p>Generates a texture size shader string for the given texture data.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">texture</strong>
+									</td>
+									<td class="description last">
+										<p>The texture.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">textureProperty</strong>
+									</td>
+									<td class="description last">
+										<p>The texture property name.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">levelSnippet</strong>
+									</td>
+									<td class="description last">
+										<p>Snippet defining the mip level.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The generated shader string.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="generateVarStatement" translate="no">.<a href="#generateVarStatement">generateVarStatement</a><span class="signature">( type : <span class="param-type">string</span>, name : <span class="param-type">string</span>, count : <span class="param-type">number</span> )</span><span class="type-signature"> : string</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns a single variable statement as a shader string for the given variable type and name.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">type</strong>
+									</td>
+									<td class="description last">
+										<p>The variable's type.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">name</strong>
+									</td>
+									<td class="description last">
+										<p>The variable's name.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">count</strong>
+									</td>
+									<td class="description last">
+										<p>The array length.</p>
+										<p>Default is <code>null</code>.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The shader string.</dt>
 						</dl>
 					</div>
 					<h3 class="name name-method" id="getActiveStack" translate="no">.<a href="#getActiveStack">getActiveStack</a><span class="signature">()</span><span class="type-signature"> : <a href="StackNode.html">StackNode</a></span> </h3>
@@ -1304,7 +1507,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>name</strong>
+										<strong translate="no">name</strong>
 									</td>
 									<td class="description last">
 										<p>The attribute's name.</p>
@@ -1312,7 +1515,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The attribute's type.</p>
@@ -1333,7 +1536,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -1372,7 +1575,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>groupName</strong>
+										<strong translate="no">groupName</strong>
 									</td>
 									<td class="description last">
 										<p>The group name.</p>
@@ -1380,7 +1583,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -1392,15 +1595,6 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<dt class="tag-returns"><strong>Returns:</strong> The array of node uniform groups.</dt>
 						</dl>
 					</div>
-					<h3 class="name name-method" id="getBindGroupsCache" translate="no">.<a href="#getBindGroupsCache">getBindGroupsCache</a><span class="signature">()</span><span class="type-signature"> : <a href="ChainMap.html">ChainMap</a></span> </h3>
-					<div class="method">
-						<div class="description">
-							<p>Returns the bind groups of the current renderer.</p>
-						</div>
-						<dl class="details">
-							<dt class="tag-returns"><strong>Returns:</strong> The cache.</dt>
-						</dl>
-					</div>
 					<h3 class="name name-method" id="getBindings" translate="no">.<a href="#getBindings">getBindings</a><span class="signature">()</span><span class="type-signature"> : Array.&lt;<a href="BindGroup.html">BindGroup</a>></span> </h3>
 					<div class="method">
 						<div class="description">
@@ -1410,7 +1604,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<dt class="tag-returns"><strong>Returns:</strong> The list of bindings.</dt>
 						</dl>
 					</div>
-					<h3 class="name name-method" id="getBufferAttributeFromNode" translate="no">.<a href="#getBufferAttributeFromNode">getBufferAttributeFromNode</a><span class="signature">( node : <span class="param-type"><a href="BufferAttributeNode.html">BufferAttributeNode</a></span>, type : <span class="param-type">string</span> )</span><span class="type-signature"> : <a href="NodeAttribute.html">NodeAttribute</a></span> </h3>
+					<h3 class="name name-method" id="getBufferAttributeFromNode" translate="no">.<a href="#getBufferAttributeFromNode">getBufferAttributeFromNode</a><span class="signature">( node : <span class="param-type"><a href="BufferAttributeNode.html">BufferAttributeNode</a></span>, type : <span class="param-type">string</span>, name : <span class="param-type">string</span> )</span><span class="type-signature"> : <a href="NodeAttribute.html">NodeAttribute</a></span> </h3>
 					<div class="method">
 						<div class="description">
 							<p>Returns an instance of <a href="NodeAttribute.html">NodeAttribute</a> for the given buffer attribute node.</p>
@@ -1419,7 +1613,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The buffer attribute node.</p>
@@ -1427,10 +1621,19 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The node type.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">name</strong>
+									</td>
+									<td class="description last">
+										<p>The name of the buffer attribute.</p>
+										<p>Default is <code>null</code>.</p>
 									</td>
 								</tr>
 							</tbody>
@@ -1466,7 +1669,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node.</p>
@@ -1474,7 +1677,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>parent</strong>
+										<strong translate="no">parent</strong>
 									</td>
 									<td class="description last">
 										<p>Whether this node refers to a shared parent cache or not.</p>
@@ -1496,7 +1699,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>data</strong>
+										<strong translate="no">data</strong>
 									</td>
 									<td class="description last">
 										<p>The data to get the closest sub-build layer from.</p>
@@ -1517,7 +1720,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The code node.</p>
@@ -1525,7 +1728,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The node type.</p>
@@ -1533,7 +1736,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -1555,7 +1758,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -1576,7 +1779,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type.</p>
@@ -1597,7 +1800,7 @@ this method might be used to convert a simple float string <code>&quot;1.0&quot;
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>texture</strong>
+										<strong translate="no">texture</strong>
 									</td>
 									<td class="description last">
 										<p>The texture.</p>
@@ -1628,7 +1831,7 @@ can be used to get these data for a specific shader stage and cache.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to get the data for.</p>
@@ -1636,7 +1839,7 @@ can be used to get these data for a specific shader stage and cache.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -1645,7 +1848,7 @@ can be used to get these data for a specific shader stage and cache.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>cache</strong>
+										<strong translate="no">cache</strong>
 									</td>
 									<td class="description last">
 										<p>An optional cache.</p>
@@ -1656,6 +1859,28 @@ can be used to get these data for a specific shader stage and cache.</p>
 						</table>
 						<dl class="details">
 							<dt class="tag-returns"><strong>Returns:</strong> The node data.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="getDeclarationName" translate="no">.<a href="#getDeclarationName">getDeclarationName</a><span class="signature">( node : <span class="param-type">Object</span> )</span><span class="type-signature"> : string</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns the identifier the given node declares in the shader. It is used
+by <a href="NodeBuilder.html#registerDeclaration">NodeBuilder#registerDeclaration</a> to detect name collisions.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">node</strong>
+									</td>
+									<td class="description last">
+										<p>The node.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The declaration name.</dt>
 						</dl>
 					</div>
 					<h3 class="name name-method" id="getDrawIndex" translate="no">.<a href="#getDrawIndex">getDrawIndex</a><span class="signature">()</span><span class="type-signature"> : string</span> <span class="type-signature">(abstract) </span></h3>
@@ -1677,7 +1902,7 @@ Only relevant for WebGL and its <code>WEBGL_multi_draw</code> extension.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type.</p>
@@ -1698,7 +1923,7 @@ Only relevant for WebGL and its <code>WEBGL_multi_draw</code> extension.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>Node that the flow was started.</p>
@@ -1706,7 +1931,7 @@ Only relevant for WebGL and its <code>WEBGL_multi_draw</code> extension.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -1746,7 +1971,7 @@ It is a similar type of method like <a href="NodeBuilder.html#getMethod">NodeBui
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>op</strong>
+										<strong translate="no">op</strong>
 									</td>
 									<td class="description last">
 										<p>The operator name to resolve.</p>
@@ -1786,7 +2011,7 @@ or the linearized index of an compute invocation within a grid of workgroups.</p
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type.</p>
@@ -1796,6 +2021,15 @@ or the linearized index of an compute invocation within a grid of workgroups.</p
 						</table>
 						<dl class="details">
 							<dt class="tag-returns"><strong>Returns:</strong> The integer type.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="getInvocationSubgroupIndex" translate="no">.<a href="#getInvocationSubgroupIndex">getInvocationSubgroupIndex</a><span class="signature">()</span><span class="type-signature"> : string</span> <span class="type-signature">(abstract) </span></h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns a builtin representing the index of an invocation within its subgroup.</p>
+						</div>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The invocation subgroup index shader string.</dt>
 						</dl>
 					</div>
 					<h3 class="name name-method" id="getMethod" translate="no">.<a href="#getMethod">getMethod</a><span class="signature">( method : <span class="param-type">string</span> )</span><span class="type-signature"> : string</span> <span class="type-signature">(abstract) </span></h3>
@@ -1809,7 +2043,7 @@ resolved to <code>textureSize</code> in GLSL.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>method</strong>
+										<strong translate="no">method</strong>
 									</td>
 									<td class="description last">
 										<p>The method name to resolve.</p>
@@ -1830,7 +2064,7 @@ resolved to <code>textureSize</code> in GLSL.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>hash</strong>
+										<strong translate="no">hash</strong>
 									</td>
 									<td class="description last">
 										<p>The hash of the node.</p>
@@ -1855,7 +2089,7 @@ to the current node's properties in the setup stage and building those propertie
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to get the properties for.</p>
@@ -1863,7 +2097,7 @@ to the current node's properties in the setup stage and building those propertie
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -1885,7 +2119,7 @@ to the current node's properties in the setup stage and building those propertie
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>uniformNode</strong>
+										<strong translate="no">uniformNode</strong>
 									</td>
 									<td class="description last">
 										<p>The uniform node.</p>
@@ -1893,7 +2127,7 @@ to the current node's properties in the setup stage and building those propertie
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The requested type.</p>
@@ -1924,7 +2158,7 @@ to the current node's properties in the setup stage and building those propertie
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The output struct node.</p>
@@ -1932,7 +2166,7 @@ to the current node's properties in the setup stage and building those propertie
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>membersLayout</strong>
+										<strong translate="no">membersLayout</strong>
 									</td>
 									<td class="description last">
 										<p>The output struct types.</p>
@@ -1944,6 +2178,52 @@ to the current node's properties in the setup stage and building those propertie
 							<dt class="tag-returns"><strong>Returns:</strong> The struct type attribute.</dt>
 						</dl>
 					</div>
+					<h3 class="name name-method" id="getOutputType" translate="no">.<a href="#getOutputType">getOutputType</a><span class="signature">( index : <span class="param-type">number</span> )</span><span class="type-signature"> : string</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns the type of the color output based on the renderer's render target.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">index</strong>
+									</td>
+									<td class="description last">
+										<p>The index of the render target texture.</p>
+										<p>Default is <code>0</code>.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The type.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="getPromotedComponentType" translate="no">.<a href="#getPromotedComponentType">getPromotedComponentType</a><span class="signature">( &hellip;nodes : <span class="param-type"><a href="Node.html">Node</a></span> )</span><span class="type-signature"> : string</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns the common component type of the input nodes. Explicit types are
+promoted first, then weak constants adopt that type, being truncated like other
+integer constants. Only weak constants out of the integer range promote it.
+Inputs consisting only of weak constants default to float.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">nodes</strong>
+									</td>
+									<td class="description last">
+										<p>The input nodes.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The promoted component type.</dt>
+						</dl>
+					</div>
 					<h3 class="name name-method" id="getPropertyName" translate="no">.<a href="#getPropertyName">getPropertyName</a><span class="signature">( node : <span class="param-type"><a href="Node.html">Node</a></span>, shaderStage : <span class="param-type">'vertex' | 'fragment' | 'compute' | 'any'</span> )</span><span class="type-signature"> : string</span> </h3>
 					<div class="method">
 						<div class="description">
@@ -1953,7 +2233,7 @@ to the current node's properties in the setup stage and building those propertie
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node.</p>
@@ -1961,7 +2241,7 @@ to the current node's properties in the setup stage and building those propertie
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -1992,27 +2272,6 @@ This is necessary since the renderer cache can reuse shaders generated in one ma
 							<dt class="tag-returns"><strong>Returns:</strong> The builder's current context without material.</dt>
 						</dl>
 					</div>
-					<h3 class="name name-method" id="getSharedDataFromNode" translate="no">.<a href="#getSharedDataFromNode">getSharedDataFromNode</a><span class="signature">( node : <span class="param-type"><a href="Node.html">Node</a></span> )</span><span class="type-signature"> : Object</span> </h3>
-					<div class="method">
-						<div class="description">
-							<p>Returns shared data object for the given node.</p>
-						</div>
-						<table class="params">
-							<tbody>
-								<tr>
-									<td class="name">
-										<strong>node</strong>
-									</td>
-									<td class="description last">
-										<p>The node to get shared data from.</p>
-									</td>
-								</tr>
-							</tbody>
-						</table>
-						<dl class="details">
-							<dt class="tag-returns"><strong>Returns:</strong> The shared data.</dt>
-						</dl>
-					</div>
 					<h3 class="name name-method" id="getSignature" translate="no">.<a href="#getSignature">getSignature</a><span class="signature">()</span><span class="type-signature"> : string</span> </h3>
 					<div class="method">
 						<div class="description">
@@ -2031,7 +2290,7 @@ This is necessary since the renderer cache can reuse shaders generated in one ma
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The output struct node.</p>
@@ -2039,7 +2298,7 @@ This is necessary since the renderer cache can reuse shaders generated in one ma
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>membersLayout</strong>
+										<strong translate="no">membersLayout</strong>
 									</td>
 									<td class="description last">
 										<p>The output struct types.</p>
@@ -2047,7 +2306,7 @@ This is necessary since the renderer cache can reuse shaders generated in one ma
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>name</strong>
+										<strong translate="no">name</strong>
 									</td>
 									<td class="description last">
 										<p>The name of the struct.</p>
@@ -2056,7 +2315,7 @@ This is necessary since the renderer cache can reuse shaders generated in one ma
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -2079,7 +2338,7 @@ or null if not found.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>name</strong>
+										<strong translate="no">name</strong>
 									</td>
 									<td class="description last">
 										<p>The name of the struct.</p>
@@ -2087,7 +2346,7 @@ or null if not found.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -2109,7 +2368,7 @@ or null if not found.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to get the output from.</p>
@@ -2130,7 +2389,7 @@ or null if not found.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>property</strong>
+										<strong translate="no">property</strong>
 									</td>
 									<td class="description last">
 										<p>The property name.</p>
@@ -2139,7 +2398,7 @@ or null if not found.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to get the sub-build from.</p>
@@ -2152,6 +2411,24 @@ or null if not found.</p>
 							<dt class="tag-returns"><strong>Returns:</strong> The sub-build property name.</dt>
 						</dl>
 					</div>
+					<h3 class="name name-method" id="getSubgroupIndex" translate="no">.<a href="#getSubgroupIndex">getSubgroupIndex</a><span class="signature">()</span><span class="type-signature"> : string</span> <span class="type-signature">(abstract) </span></h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns a builtin representing the index of the current invocation's subgroup within its workgroup.</p>
+						</div>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The subgroup index shader string.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="getSubgroupSize" translate="no">.<a href="#getSubgroupSize">getSubgroupSize</a><span class="signature">()</span><span class="type-signature"> : string</span> <span class="type-signature">(abstract) </span></h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns a builtin representing the size of a subgroup within the current shader.</p>
+						</div>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The subgroup size shader string.</dt>
+						</dl>
+					</div>
 					<h3 class="name name-method" id="getTernary" translate="no">.<a href="#getTernary">getTernary</a><span class="signature">( condSnippet : <span class="param-type">string</span>, ifSnippet : <span class="param-type">string</span>, elseSnippet : <span class="param-type">string</span> )</span><span class="type-signature"> : string</span> <span class="type-signature">(abstract) </span></h3>
 					<div class="method">
 						<div class="description">
@@ -2162,7 +2439,7 @@ a ternary op as <code>cond ? x : y</code> whereas WGSL would output it as <code>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>condSnippet</strong>
+										<strong translate="no">condSnippet</strong>
 									</td>
 									<td class="description last">
 										<p>The condition determining which expression gets resolved.</p>
@@ -2170,7 +2447,7 @@ a ternary op as <code>cond ? x : y</code> whereas WGSL would output it as <code>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>ifSnippet</strong>
+										<strong translate="no">ifSnippet</strong>
 									</td>
 									<td class="description last">
 										<p>The expression to resolve to if the condition is true.</p>
@@ -2178,7 +2455,7 @@ a ternary op as <code>cond ? x : y</code> whereas WGSL would output it as <code>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>elseSnippet</strong>
+										<strong translate="no">elseSnippet</strong>
 									</td>
 									<td class="description last">
 										<p>The expression to resolve to if the condition is false.</p>
@@ -2200,7 +2477,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type.</p>
@@ -2221,7 +2498,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>array</strong>
+										<strong translate="no">array</strong>
 									</td>
 									<td class="description last">
 										<p>The typed array.</p>
@@ -2242,7 +2519,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>attribute</strong>
+										<strong translate="no">attribute</strong>
 									</td>
 									<td class="description last">
 										<p>The buffer attribute.</p>
@@ -2263,7 +2540,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>length</strong>
+										<strong translate="no">length</strong>
 									</td>
 									<td class="description last">
 										<p>The length.</p>
@@ -2271,7 +2548,7 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>componentType</strong>
+										<strong translate="no">componentType</strong>
 									</td>
 									<td class="description last">
 										<p>The component type.</p>
@@ -2293,7 +2570,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The data type.</p>
@@ -2305,6 +2582,15 @@ so this method can be used to hide the conversion.</p>
 							<dt class="tag-returns"><strong>Returns:</strong> The length.</dt>
 						</dl>
 					</div>
+					<h3 class="name name-method" id="getUniformBufferLimit" translate="no">.<a href="#getUniformBufferLimit">getUniformBufferLimit</a><span class="signature">()</span><span class="type-signature"> : number</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns the maximum number of bytes available for uniform buffers.</p>
+						</div>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The maximum number of bytes available for uniform buffers.</dt>
+						</dl>
+					</div>
 					<h3 class="name name-method" id="getUniformFromNode" translate="no">.<a href="#getUniformFromNode">getUniformFromNode</a><span class="signature">( node : <span class="param-type"><a href="UniformNode.html">UniformNode</a></span>, type : <span class="param-type">string</span>, shaderStage : <span class="param-type">'vertex' | 'fragment' | 'compute' | 'any'</span>, name : <span class="param-type">string</span> )</span><span class="type-signature"> : <a href="NodeUniform.html">NodeUniform</a></span> </h3>
 					<div class="method">
 						<div class="description">
@@ -2314,7 +2600,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The uniform node.</p>
@@ -2322,7 +2608,7 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The uniform type.</p>
@@ -2330,7 +2616,7 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -2339,7 +2625,7 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>name</strong>
+										<strong translate="no">name</strong>
 									</td>
 									<td class="description last">
 										<p>The name of the uniform.</p>
@@ -2361,7 +2647,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -2382,7 +2668,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The variable's type.</p>
@@ -2390,7 +2676,7 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>name</strong>
+										<strong translate="no">name</strong>
 									</td>
 									<td class="description last">
 										<p>The variable's name.</p>
@@ -2398,7 +2684,7 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>count</strong>
+										<strong translate="no">count</strong>
 									</td>
 									<td class="description last">
 										<p>The array length.</p>
@@ -2411,7 +2697,7 @@ so this method can be used to hide the conversion.</p>
 							<dt class="tag-returns"><strong>Returns:</strong> The shader string.</dt>
 						</dl>
 					</div>
-					<h3 class="name name-method" id="getVarFromNode" translate="no">.<a href="#getVarFromNode">getVarFromNode</a><span class="signature">( node : <span class="param-type"><a href="VarNode.html">VarNode</a></span>, name : <span class="param-type">string</span>, type : <span class="param-type">string</span>, shaderStage : <span class="param-type">'vertex' | 'fragment' | 'compute' | 'any'</span>, readOnly : <span class="param-type">boolean</span> )</span><span class="type-signature"> : <a href="NodeVar.html">NodeVar</a></span> </h3>
+					<h3 class="name name-method" id="getVarFromNode" translate="no">.<a href="#getVarFromNode">getVarFromNode</a><span class="signature">( node : <span class="param-type"><a href="VarNode.html">VarNode</a></span>, name : <span class="param-type">string</span>, type : <span class="param-type">string</span>, shaderStage : <span class="param-type">'vertex' | 'fragment' | 'compute' | 'any'</span>, readOnly : <span class="param-type">boolean</span>, local : <span class="param-type">boolean</span>, property : <span class="param-type">string</span> )</span><span class="type-signature"> : <a href="NodeVar.html">NodeVar</a></span> </h3>
 					<div class="method">
 						<div class="description">
 							<p>Returns an instance of <a href="NodeVar.html">NodeVar</a> for the given variable node.</p>
@@ -2420,7 +2706,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The variable node.</p>
@@ -2428,7 +2714,7 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>name</strong>
+										<strong translate="no">name</strong>
 									</td>
 									<td class="description last">
 										<p>The variable's name.</p>
@@ -2437,7 +2723,7 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The variable's type.</p>
@@ -2446,7 +2732,7 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -2455,11 +2741,29 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>readOnly</strong>
+										<strong translate="no">readOnly</strong>
 									</td>
 									<td class="description last">
 										<p>Whether the variable is read-only or not.</p>
 										<p>Default is <code>false</code>.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">local</strong>
+									</td>
+									<td class="description last">
+										<p>Whether the variable is declared locally in the flow instead of the variable section.</p>
+										<p>Default is <code>false</code>.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">property</strong>
+									</td>
+									<td class="description last">
+										<p>The node data property that holds the variable. Allows a node to own more than one variable.</p>
+										<p>Default is <code>'variable'</code>.</p>
 									</td>
 								</tr>
 							</tbody>
@@ -2468,7 +2772,7 @@ so this method can be used to hide the conversion.</p>
 							<dt class="tag-returns"><strong>Returns:</strong> The node variable.</dt>
 						</dl>
 					</div>
-					<h3 class="name name-method" id="getVars" translate="no">.<a href="#getVars">getVars</a><span class="signature">( shaderStage : <span class="param-type">'vertex' | 'fragment' | 'compute' | 'any'</span> )</span><span class="type-signature"> : string</span> </h3>
+					<h3 class="name name-method" id="getVars" translate="no">.<a href="#getVars">getVars</a><span class="signature">( shaderStage : <span class="param-type">'vertex' | 'fragment' | 'compute' | 'any'</span>, global : <span class="param-type">boolean</span> )</span><span class="type-signature"> : string</span> </h3>
 					<div class="method">
 						<div class="description">
 							<p>Returns the variable definitions as a shader string for the given shader stage.</p>
@@ -2477,10 +2781,19 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">global</strong>
+									</td>
+									<td class="description last">
+										<p>Whether the variables are global.</p>
+										<p>Default is <code>false</code>.</p>
 									</td>
 								</tr>
 							</tbody>
@@ -2498,7 +2811,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The varying node.</p>
@@ -2506,7 +2819,7 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>name</strong>
+										<strong translate="no">name</strong>
 									</td>
 									<td class="description last">
 										<p>The varying's name.</p>
@@ -2515,7 +2828,7 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The varying's type.</p>
@@ -2524,7 +2837,7 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>interpolationType</strong>
+										<strong translate="no">interpolationType</strong>
 									</td>
 									<td class="description last">
 										<p>The interpolation type of the varying.</p>
@@ -2533,7 +2846,7 @@ so this method can be used to hide the conversion.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>interpolationSampling</strong>
+										<strong translate="no">interpolationSampling</strong>
 									</td>
 									<td class="description last">
 										<p>The interpolation sampling type of the varying.</p>
@@ -2555,7 +2868,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage.</p>
@@ -2576,7 +2889,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The matrix type.</p>
@@ -2588,6 +2901,53 @@ so this method can be used to hide the conversion.</p>
 							<dt class="tag-returns"><strong>Returns:</strong> The vector type.</dt>
 						</dl>
 					</div>
+					<h3 class="name name-method" id="getVectorSelect" translate="no">.<a href="#getVectorSelect">getVectorSelect</a><span class="signature">( condSnippet : <span class="param-type">string</span>, ifSnippet : <span class="param-type">string</span>, elseSnippet : <span class="param-type">string</span>, type : <span class="param-type">string</span> )</span><span class="type-signature"> : string</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns the native snippet for a per-component vector select. The default
+implementation uses <a href="NodeBuilder.html#getTernary">NodeBuilder#getTernary</a>; renderers can
+override this when their ternary operation does not accept vectors.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">condSnippet</strong>
+									</td>
+									<td class="description last">
+										<p>The per-component boolean (<code>bvecN</code>) condition.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">ifSnippet</strong>
+									</td>
+									<td class="description last">
+										<p>The vector expression selected where <code>condSnippet</code> is <code>true</code>.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">elseSnippet</strong>
+									</td>
+									<td class="description last">
+										<p>The vector expression selected where <code>condSnippet</code> is <code>false</code>.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">type</strong>
+									</td>
+									<td class="description last">
+										<p>The (vector) type of <code>ifSnippet</code>/<code>elseSnippet</code>.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The resolved method name.</dt>
+						</dl>
+					</div>
 					<h3 class="name name-method" id="getVectorType" translate="no">.<a href="#getVectorType">getVectorType</a><span class="signature">( type : <span class="param-type">string</span> )</span><span class="type-signature"> : string</span> </h3>
 					<div class="method">
 						<div class="description">
@@ -2597,7 +2957,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type.</p>
@@ -2627,7 +2987,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>name</strong>
+										<strong translate="no">name</strong>
 									</td>
 									<td class="description last">
 										<p>The attribute name.</p>
@@ -2639,6 +2999,27 @@ so this method can be used to hide the conversion.</p>
 							<dt class="tag-returns"><strong>Returns:</strong> Whether the given attribute name is defined in the geometry.</dt>
 						</dl>
 					</div>
+					<h3 class="name name-method" id="hasWriteUsage" translate="no">.<a href="#hasWriteUsage">hasWriteUsage</a><span class="signature">( node : <span class="param-type"><a href="Node.html">Node</a></span> )</span><span class="type-signature"> : boolean</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns whether the given node has been written to in any shader stage.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">node</strong>
+									</td>
+									<td class="description last">
+										<p>The node to check.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> Whether the node has been written to.</dt>
+						</dl>
+					</div>
 					<h3 class="name name-method" id="includes" translate="no">.<a href="#includes">includes</a><span class="signature">( node : <span class="param-type"><a href="Node.html">Node</a></span> )</span><span class="type-signature"> : boolean</span> </h3>
 					<div class="method">
 						<div class="description">
@@ -2648,7 +3029,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to test.</p>
@@ -2669,7 +3050,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to increase the usage count for.</p>
@@ -2690,7 +3071,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>name</strong>
+										<strong translate="no">name</strong>
 									</td>
 									<td class="description last">
 										<p>The requested feature.</p>
@@ -2702,6 +3083,15 @@ so this method can be used to hide the conversion.</p>
 							<dt class="tag-returns"><strong>Returns:</strong> Whether the requested feature is supported or not.</dt>
 						</dl>
 					</div>
+					<h3 class="name name-method" id="isContextAssign" translate="no">.<a href="#isContextAssign">isContextAssign</a><span class="signature">()</span><span class="type-signature"> : boolean</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns whether the builder is currently in an assignment context.</p>
+						</div>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> Whether the builder is in an assignment context.</dt>
+						</dl>
+					</div>
 					<h3 class="name name-method" id="isDeterministic" translate="no">.<a href="#isDeterministic">isDeterministic</a><span class="signature">( node : <span class="param-type"><a href="Node.html">Node</a></span> )</span><span class="type-signature"> : boolean</span> </h3>
 					<div class="method">
 						<div class="description">
@@ -2711,7 +3101,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The varying node.</p>
@@ -2732,7 +3122,7 @@ so this method can be used to hide the conversion.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>texture</strong>
+										<strong translate="no">texture</strong>
 									</td>
 									<td class="description last">
 										<p>The texture to check.</p>
@@ -2742,6 +3132,15 @@ so this method can be used to hide the conversion.</p>
 						</table>
 						<dl class="details">
 							<dt class="tag-returns"><strong>Returns:</strong> Whether the given texture is filtered or not.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="isFlatShading" translate="no">.<a href="#isFlatShading">isFlatShading</a><span class="signature">()</span><span class="type-signature"> : boolean</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Whether the material is using flat shading or not.</p>
+						</div>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> Whether the material is using flat shading or not.</dt>
 						</dl>
 					</div>
 					<h3 class="name name-method" id="isFlipY" translate="no">.<a href="#isFlipY">isFlipY</a><span class="signature">()</span><span class="type-signature"> : boolean</span> <span class="type-signature">(abstract) </span></h3>
@@ -2763,7 +3162,7 @@ this method evaluate to <code>true</code>, WebGPU to <code>false</code>.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type.</p>
@@ -2784,7 +3183,7 @@ this method evaluate to <code>true</code>, WebGPU to <code>false</code>.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type to check.</p>
@@ -2814,7 +3213,7 @@ this method evaluate to <code>true</code>, WebGPU to <code>false</code>.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type to check.</p>
@@ -2826,6 +3225,50 @@ this method evaluate to <code>true</code>, WebGPU to <code>false</code>.</p>
 							<dt class="tag-returns"><strong>Returns:</strong> Whether the given type is a reference type or not.</dt>
 						</dl>
 					</div>
+					<h3 class="name name-method" id="isReservedKeyword" translate="no">.<a href="#isReservedKeyword">isReservedKeyword</a><span class="signature">( name : <span class="param-type">string</span> )</span><span class="type-signature"> : boolean</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns whether the given name is a reserved keyword of the backend's
+shading language. Backends override this method to provide their
+language-specific keywords.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">name</strong>
+									</td>
+									<td class="description last">
+										<p>The name to test.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> Whether the name is a reserved keyword or not.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="isScalar" translate="no">.<a href="#isScalar">isScalar</a><span class="signature">( type : <span class="param-type">string</span> )</span><span class="type-signature"> : boolean</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Whether the given type is a scalar type or not.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">type</strong>
+									</td>
+									<td class="description last">
+										<p>The type to check.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> Whether the given type is a scalar type or not.</dt>
+						</dl>
+					</div>
 					<h3 class="name name-method" id="isVector" translate="no">.<a href="#isVector">isVector</a><span class="signature">( type : <span class="param-type">string</span> )</span><span class="type-signature"> : boolean</span> </h3>
 					<div class="method">
 						<div class="description">
@@ -2835,7 +3278,7 @@ this method evaluate to <code>true</code>, WebGPU to <code>false</code>.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>type</strong>
+										<strong translate="no">type</strong>
 									</td>
 									<td class="description last">
 										<p>The type to check.</p>
@@ -2866,7 +3309,7 @@ when computing motion vectors with <a href="VelocityNode.html">VelocityNode</a>.
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>texture</strong>
+										<strong translate="no">texture</strong>
 									</td>
 									<td class="description last">
 										<p>The texture to check.</p>
@@ -2878,6 +3321,12 @@ when computing motion vectors with <a href="VelocityNode.html">VelocityNode</a>.
 							<dt class="tag-returns"><strong>Returns:</strong> Whether the given texture requires a conversion to working color space or not.</dt>
 						</dl>
 					</div>
+					<h3 class="name name-method" id="prebuild" translate="no">.<a href="#prebuild">prebuild</a><span class="signature">()</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Prebuild the node builder.</p>
+						</div>
+					</div>
 					<h3 class="name name-method" id="registerDeclaration" translate="no">.<a href="#registerDeclaration">registerDeclaration</a><span class="signature">( node : <span class="param-type">Object</span> )</span> </h3>
 					<div class="method">
 						<div class="description">
@@ -2887,7 +3336,7 @@ when computing motion vectors with <a href="VelocityNode.html">VelocityNode</a>.
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to be registered.</p>
@@ -2905,7 +3354,7 @@ when computing motion vectors with <a href="VelocityNode.html">VelocityNode</a>.
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>stack</strong>
+										<strong translate="no">stack</strong>
 									</td>
 									<td class="description last">
 										<p>The stack node to remove.</p>
@@ -2923,7 +3372,7 @@ when computing motion vectors with <a href="VelocityNode.html">VelocityNode</a>.
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to remove.</p>
@@ -2968,7 +3417,7 @@ when computing motion vectors with <a href="VelocityNode.html">VelocityNode</a>.
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>stack</strong>
+										<strong translate="no">stack</strong>
 									</td>
 									<td class="description last">
 										<p>The stack node to add.</p>
@@ -2986,7 +3435,7 @@ when computing motion vectors with <a href="VelocityNode.html">VelocityNode</a>.
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>buildStage</strong>
+										<strong translate="no">buildStage</strong>
 									</td>
 									<td class="description last">
 										<p>The build stage to set.</p>
@@ -3004,7 +3453,7 @@ when computing motion vectors with <a href="VelocityNode.html">VelocityNode</a>.
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>cache</strong>
+										<strong translate="no">cache</strong>
 									</td>
 									<td class="description last">
 										<p>The cache to set.</p>
@@ -3022,7 +3471,7 @@ when computing motion vectors with <a href="VelocityNode.html">VelocityNode</a>.
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>context</strong>
+										<strong translate="no">context</strong>
 									</td>
 									<td class="description last">
 										<p>The context to set.</p>
@@ -3041,7 +3490,7 @@ This method sets the given node (value) with the given hash (key) into this dict
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>node</strong>
+										<strong translate="no">node</strong>
 									</td>
 									<td class="description last">
 										<p>The node to add.</p>
@@ -3049,7 +3498,7 @@ This method sets the given node (value) with the given hash (key) into this dict
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>hash</strong>
+										<strong translate="no">hash</strong>
 									</td>
 									<td class="description last">
 										<p>The hash of the node.</p>
@@ -3067,7 +3516,7 @@ This method sets the given node (value) with the given hash (key) into this dict
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>shaderStage</strong>
+										<strong translate="no">shaderStage</strong>
 									</td>
 									<td class="description last">
 										<p>The shader stage to set.</p>

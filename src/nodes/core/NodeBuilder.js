@@ -8,7 +8,7 @@ import ParameterNode from './ParameterNode.js';
 import StructType from './StructType.js';
 import FunctionNode from '../code/FunctionNode.js';
 import NodeMaterial from '../../materials/nodes/NodeMaterial.js';
-import { getDataFromObject, getTypeFromLength } from './NodeUtils.js';
+import { getTypeFromLength, getTextureType, isArrayAsParameter, mergeContext } from './NodeUtils.js';
 import { NodeUpdateType, defaultBuildStages, shaderStages } from './constants.js';
 
 import {
@@ -20,7 +20,6 @@ import { stack } from './StackNode.js';
 import { getCurrentStack, setCurrentStack } from '../tsl/TSLBase.js';
 
 import CubeRenderTarget from '../../renderers/common/CubeRenderTarget.js';
-import ChainMap from '../../renderers/common/ChainMap.js';
 
 import BindGroup from '../../renderers/common/BindGroup.js';
 
@@ -31,13 +30,40 @@ import { Vector2 } from '../../math/Vector2.js';
 import { Vector3 } from '../../math/Vector3.js';
 import { Vector4 } from '../../math/Vector4.js';
 import { Float16BufferAttribute } from '../../core/BufferAttribute.js';
-import { warn, error } from '../../utils.js';
+import { warn, error, yieldToMain } from '../../utils.js';
 
 let _id = 0;
 
-const sharedNodeData = new WeakMap();
+const _functionNodeCache = new WeakMap();
+const _layoutDefaultsCache = new WeakMap();
 
-const rendererCache = new WeakMap();
+// Inputs of a layout function call. They can be destructured as an array or as an object.
+const _createLayoutInputs = ( layout, values ) => {
+
+	const inputs = {
+		[ Symbol.iterator ]() {
+
+			let index = 0;
+			const values = Object.values( this );
+			return {
+				next: () => ( {
+					value: values[ index ],
+					done: index ++ >= values.length
+				} )
+			};
+
+		}
+	};
+
+	layout.inputs.forEach( ( input, i ) => {
+
+		inputs[ input.name ] = values[ i ];
+
+	} );
+
+	return inputs;
+
+};
 
 const typeFromArray = new Map( [
 	[ Int8Array, 'int' ],
@@ -49,7 +75,7 @@ const typeFromArray = new Map( [
 	[ Float32Array, 'float' ]
 ] );
 
-const toFloat = ( value ) => {
+const _toFloat = ( value ) => {
 
 	if ( /e/g.test( value ) ) {
 
@@ -62,6 +88,83 @@ const toFloat = ( value ) => {
 		return value + ( value % 1 ? '' : '.0' );
 
 	}
+
+};
+
+const _componentTypeRanks = { bool: 0, uint: 1, int: 2, float: 3 };
+
+/**
+ * Data of a node in a shader stage. All common properties are declared upfront,
+ * so the objects share a single shape.
+ *
+ * @private
+ */
+class NodeData {
+
+	constructor() {
+
+		this.properties = undefined;
+		this.type = undefined;
+		this.typeFromOutput = undefined;
+		this.buildStages = undefined;
+		this.usageCount = undefined;
+		this.readUsageCount = undefined;
+		this.writeUsageCount = undefined;
+		this.stack = undefined;
+		this.stages = undefined;
+		this.snippet = undefined;
+		this.propertyName = undefined;
+		this.generated = undefined;
+		this.flowBlock = undefined;
+		this.assign = undefined;
+		this.forceDeclaration = undefined;
+		this.variable = undefined;
+		this.cacheVariable = undefined;
+		this.uniform = undefined;
+		this.subBuilds = undefined;
+		this.subBuildsCache = undefined;
+
+	}
+
+}
+
+const _componentTypeCache = new Map();
+const _typeLengthCache = new Map();
+const _isVectorCache = new Map();
+const _isMatrixCache = new Map();
+const _isIntegerCache = new Map();
+
+const _checkWriteUsage = ( data ) => {
+
+	if ( data.writeUsageCount > 0 ) return true;
+
+	if ( data.subBuildsCache !== undefined ) {
+
+		for ( const subBuild in data.subBuildsCache ) {
+
+			if ( _checkWriteUsage( data.subBuildsCache[ subBuild ] ) ) {
+
+				return true;
+
+			}
+
+		}
+
+	}
+
+	return false;
+
+};
+
+const _hasContextOverrides = ( context, baseContext ) => {
+
+	for ( const key in context ) {
+
+		if ( key !== 'nodeBlock' && key !== 'nodeLoop' && context[ key ] !== baseContext[ key ] ) return true;
+
+	}
+
+	return false;
 
 };
 
@@ -102,6 +205,14 @@ class NodeBuilder {
 		this.geometry = ( object && object.geometry ) || null;
 
 		/**
+		 * The compute node, if building for compute.
+		 *
+		 * @type {?ComputeNode}
+		 * @default null
+		 */
+		this.compute = null;
+
+		/**
 		 * The current renderer.
 		 *
 		 * @type {Renderer}
@@ -135,16 +246,19 @@ class NodeBuilder {
 		 * A list of all nodes the builder is processing
 		 * for this 3D object.
 		 *
-		 * @type {Array<Node>}
+		 * @type {Set<Node>}
 		 */
-		this.nodes = [];
+		this.nodes = new Set();
 
 		/**
-		 * A list of all sequential nodes.
+		 * A list of all nodes the builder is processing in sequential order.
 		 *
-		 * @type {Array<Node>}
+		 * This is used to determine the update order of nodes, which is important for
+		 * {@link NodeUpdateType#UPDATE_BEFORE} and {@link NodeUpdateType#UPDATE_AFTER}.
+		 *
+		 * @type {Set<Node>}
 		 */
-		this.sequentialNodes = [];
+		this.sequentialNodes = new Set();
 
 		/**
 		 * A list of all nodes which {@link Node#update} method should be executed.
@@ -212,6 +326,24 @@ class NodeBuilder {
 		 * @type {?ClippingContext}
 		 */
 		this.clippingContext = null;
+
+		/**
+		 * Whether the built material uses hardware clipping or not.
+		 *
+		 * @type {boolean}
+		 * @default false
+		 */
+		this.hardwareClipping = false;
+
+		/**
+		 * Whether the build embeds data of the 3D object it is built for, like its buffers,
+		 * instead of binding the data of the rendered object. Such builds can't be shared
+		 * with other objects, so the renderer doesn't cache them.
+		 *
+		 * @type {boolean}
+		 * @default false
+		 */
+		this.objectSpecific = false;
 
 		/**
 		 * The generated vertex shader.
@@ -463,6 +595,15 @@ class NodeBuilder {
 		 */
 		this.fnCall = null;
 
+		/**
+		 * The block of generated code the builder is in, e.g. a loop body or a conditional branch.
+		 * Every generated block is a new object linked to its parent, `null` outside of any block.
+		 *
+		 * @type {?{parent: ?Object}}
+		 * @default null
+		 */
+		this.flowBlock = null;
+
 		Object.defineProperty( this, 'id', { value: _id ++ } );
 
 	}
@@ -488,27 +629,6 @@ class NodeBuilder {
 		const material = this.material;
 
 		return material.transparent === false && material.blending === NormalBlending && material.alphaToCoverage === false;
-
-	}
-
-	/**
-	 * Returns the bind groups of the current renderer.
-	 *
-	 * @return {ChainMap} The cache.
-	 */
-	getBindGroupsCache() {
-
-		let bindGroupsCache = rendererCache.get( this.renderer );
-
-		if ( bindGroupsCache === undefined ) {
-
-			bindGroupsCache = new ChainMap();
-
-			rendererCache.set( this.renderer, bindGroupsCache );
-
-		}
-
-		return bindGroupsCache;
 
 	}
 
@@ -549,7 +669,27 @@ class NodeBuilder {
 	 */
 	includes( node ) {
 
-		return this.nodes.includes( node );
+		return this.nodes.has( node );
+
+	}
+
+	/**
+	 * Returns the type of the color output based on the renderer's render target.
+	 *
+	 * @param {number} [index=0] - The index of the render target texture.
+	 * @return {string} The type.
+	 */
+	getOutputType( index = 0 ) {
+
+		const renderTarget = this.renderer.getRenderTarget();
+
+		if ( renderTarget !== null && renderTarget.textures[ index ] !== undefined ) {
+
+			return getTextureType( renderTarget.textures[ index ] );
+
+		}
+
+		return 'vec4';
 
 	}
 
@@ -572,41 +712,31 @@ class NodeBuilder {
 	 */
 	_getBindGroup( groupName, bindings ) {
 
-		const bindGroupsCache = this.getBindGroupsCache();
+		const groupNode = bindings[ 0 ].groupNode;
 
-		//
+		let sharedGroup = groupNode.shared;
 
-		const bindingsArray = [];
+		if ( sharedGroup ) {
 
-		let sharedGroup = true;
+			for ( let i = 1; i < bindings.length; i ++ ) {
 
-		for ( const binding of bindings ) {
+				if ( groupNode !== bindings[ i ].groupNode ) {
 
-			bindingsArray.push( binding );
+					sharedGroup = false;
 
-			sharedGroup = sharedGroup && binding.groupNode.shared;
+				}
+
+			}
 
 		}
 
 		//
 
-		let bindGroup;
+		let bindGroup = new BindGroup( groupName, bindings );
 
-		if ( sharedGroup ) {
+		if ( sharedGroup && this.renderer._bindings !== undefined ) {
 
-			bindGroup = bindGroupsCache.get( bindingsArray );
-
-			if ( bindGroup === undefined ) {
-
-				bindGroup = new BindGroup( groupName, bindingsArray, this.bindingsIndexes[ groupName ].group );
-
-				bindGroupsCache.set( bindingsArray, bindGroup );
-
-			}
-
-		} else {
-
-			bindGroup = new BindGroup( groupName, bindingsArray, this.bindingsIndexes[ groupName ].group );
+			bindGroup = this.renderer._bindings.getSharedBindGroup( bindGroup );
 
 		}
 
@@ -713,8 +843,6 @@ class NodeBuilder {
 			const bindingGroup = bindingsGroups[ i ];
 			this.bindingsIndexes[ bindingGroup.name ].group = i;
 
-			bindingGroup.index = i;
-
 		}
 
 	}
@@ -739,9 +867,9 @@ class NodeBuilder {
 	 */
 	addNode( node ) {
 
-		if ( this.nodes.includes( node ) === false ) {
+		if ( this.nodes.has( node ) === false ) {
 
-			this.nodes.push( node );
+			this.nodes.add( node );
 
 			this.setHashNode( node, node.getHash( this ) );
 
@@ -758,9 +886,12 @@ class NodeBuilder {
 	 */
 	addSequentialNode( node ) {
 
-		if ( this.sequentialNodes.includes( node ) === false ) {
+		const updateBeforeType = node.updateBeforeType;
+		const updateAfterType = node.updateAfterType;
 
-			this.sequentialNodes.push( node );
+		if ( updateBeforeType !== NodeUpdateType.NONE || updateAfterType !== NodeUpdateType.NONE ) {
+
+			this.sequentialNodes.add( node );
 
 		}
 
@@ -773,7 +904,7 @@ class NodeBuilder {
 
 		for ( const node of this.nodes ) {
 
-			const updateType = node.getUpdateType();
+			const updateType = node.updateType;
 
 			if ( updateType !== NodeUpdateType.NONE ) {
 
@@ -785,8 +916,8 @@ class NodeBuilder {
 
 		for ( const node of this.sequentialNodes ) {
 
-			const updateBeforeType = node.getUpdateBeforeType();
-			const updateAfterType = node.getUpdateAfterType();
+			const updateBeforeType = node.updateBeforeType;
+			const updateAfterType = node.updateAfterType;
 
 			if ( updateBeforeType !== NodeUpdateType.NONE ) {
 
@@ -817,6 +948,17 @@ class NodeBuilder {
 	}
 
 	/**
+	 * A reference to the render pipeline.
+	 *
+	 * @type {RenderPipeline}
+	 */
+	get renderPipeline() {
+
+		return this.context.renderPipeline;
+
+	}
+
+	/**
 	 * Whether the given texture is filtered or not.
 	 *
 	 * @param {Texture} texture - The texture to check.
@@ -836,7 +978,7 @@ class NodeBuilder {
 	 */
 	getUniformBufferLimit() {
 
-		return 16384;
+		return this.renderer.backend.capabilities.getUniformBufferLimit();
 
 	}
 
@@ -871,7 +1013,7 @@ class NodeBuilder {
 
 		if ( lastChain !== node ) {
 
-			throw new Error( 'NodeBuilder: Invalid node chaining!' );
+			throw new Error( 'THREE.NodeBuilder: Invalid node chaining!' );
 
 		}
 
@@ -905,6 +1047,23 @@ class NodeBuilder {
 	getTernary( /* condSnippet, ifSnippet, elseSnippet*/ ) {
 
 		return null;
+
+	}
+
+	/**
+	 * Returns the native snippet for a per-component vector select. The default
+	 * implementation uses {@link NodeBuilder#getTernary}; renderers can
+	 * override this when their ternary operation does not accept vectors.
+	 *
+	 * @param {string} condSnippet - The per-component boolean (`bvecN`) condition.
+	 * @param {string} ifSnippet - The vector expression selected where `condSnippet` is `true`.
+	 * @param {string} elseSnippet - The vector expression selected where `condSnippet` is `false`.
+	 * @param {string} type - The (vector) type of `ifSnippet`/`elseSnippet`.
+	 * @return {string} The resolved method name.
+	 */
+	getVectorSelect( condSnippet, ifSnippet, elseSnippet /*, type*/ ) {
+
+		return this.getTernary( condSnippet, ifSnippet, elseSnippet );
 
 	}
 
@@ -967,7 +1126,7 @@ class NodeBuilder {
 
 		const previousContext = this.getContext();
 
-		this.setContext( { ...this.context, ...context } );
+		this.setContext( mergeContext( this.context, context ) );
 
 		return previousContext;
 
@@ -988,7 +1147,10 @@ class NodeBuilder {
 		delete context.getOutput;
 		delete context.getTextureLevel;
 		delete context.getAO;
+		delete context.getGI;
 		delete context.getShadow;
+		delete context.nodeLoop;
+		delete context.nodeBlock;
 
 		return context;
 
@@ -1108,6 +1270,75 @@ class NodeBuilder {
 	}
 
 	/**
+	 * Returns a builtin representing the size of a subgroup within the current shader.
+	 *
+	 * @abstract
+	 * @return {string} The subgroup size shader string.
+	 */
+	getSubgroupSize() {
+
+		warn( 'Abstract function.' );
+
+	}
+
+	/**
+	 * Returns a builtin representing the index of an invocation within its subgroup.
+	 *
+	 * @abstract
+	 * @return {string} The invocation subgroup index shader string.
+	 */
+	getInvocationSubgroupIndex() {
+
+		warn( 'Abstract function.' );
+
+	}
+
+	/**
+	 * Returns a builtin representing the index of the current invocation's subgroup within its workgroup.
+	 *
+	 * @abstract
+	 * @return {string} The subgroup index shader string.
+	 */
+	getSubgroupIndex() {
+
+		warn( 'Abstract function.' );
+
+	}
+
+	/**
+	 * Enables subgroups.
+	 *
+	 * @abstract
+	 */
+	enableSubGroups() {
+
+		warn( 'Abstract function.' );
+
+	}
+
+	/**
+	 * Enables 16 bit floats.
+	 *
+	 * @abstract
+	 */
+	enableShaderF16() {
+
+		warn( 'Abstract function.' );
+
+	}
+
+	/**
+	 * Enables dual source blending.
+	 *
+	 * @abstract
+	 */
+	enableDualSourceBlending() {
+
+		warn( 'Abstract function.' );
+
+	}
+
+	/**
 	 * Whether to flip texture data along its vertical axis or not. WebGL needs
 	 * this method evaluate to `true`, WebGPU to `false`.
 	 *
@@ -1117,6 +1348,17 @@ class NodeBuilder {
 	isFlipY() {
 
 		return false;
+
+	}
+
+	/**
+	 * Returns whether the builder is currently in an assignment context.
+	 *
+	 * @return {boolean} Whether the builder is in an assignment context.
+	 */
+	isContextAssign() {
+
+		return this.context.assign === true;
 
 	}
 
@@ -1131,7 +1373,47 @@ class NodeBuilder {
 		const nodeData = this.getDataFromNode( node );
 		nodeData.usageCount = nodeData.usageCount === undefined ? 1 : nodeData.usageCount + 1;
 
+		if ( this.isContextAssign() ) {
+
+			nodeData.writeUsageCount = nodeData.writeUsageCount === undefined ? 1 : nodeData.writeUsageCount + 1;
+
+		} else {
+
+			nodeData.readUsageCount = nodeData.readUsageCount === undefined ? 1 : nodeData.readUsageCount + 1;
+
+		}
+
 		return nodeData.usageCount;
+
+	}
+
+	/**
+	 * Returns whether the given node has been written to in any shader stage.
+	 *
+	 * @param {Node} node - The node to check.
+	 * @return {boolean} Whether the node has been written to.
+	 */
+	hasWriteUsage( node ) {
+
+		const refNode = node.getShared( this );
+		const cache = refNode.isGlobal( this ) ? this.globalCache : this.cache;
+		const nodeData = cache.getData( refNode );
+
+		if ( nodeData !== undefined ) {
+
+			for ( const shaderStage in nodeData ) {
+
+				if ( _checkWriteUsage( nodeData[ shaderStage ] ) ) {
+
+					return true;
+
+				}
+
+			}
+
+		}
+
+		return false;
 
 	}
 
@@ -1162,6 +1444,21 @@ class NodeBuilder {
 	 * @return {string} The generated shader string.
 	 */
 	generateTextureLod( /* texture, textureProperty, uvSnippet, depthSnippet, levelSnippet */ ) {
+
+		warn( 'Abstract function.' );
+
+	}
+
+	/**
+	 * Generates a texture size shader string for the given texture data.
+	 *
+	 * @abstract
+	 * @param {Texture} texture - The texture.
+	 * @param {string} textureProperty - The texture property name.
+	 * @param {string} levelSnippet - Snippet defining the mip level.
+	 * @return {string} The generated shader string.
+	 */
+	generateTextureSize( /* texture, textureProperty, levelSnippet */ ) {
 
 		warn( 'Abstract function.' );
 
@@ -1262,17 +1559,17 @@ class NodeBuilder {
 			if ( type === 'float' || type === 'int' || type === 'uint' ) value = 0;
 			else if ( type === 'bool' ) value = false;
 			else if ( type === 'color' ) value = new Color();
-			else if ( type === 'vec2' || type === 'uvec2' || type === 'ivec2' ) value = new Vector2();
-			else if ( type === 'vec3' || type === 'uvec3' || type === 'ivec3' ) value = new Vector3();
-			else if ( type === 'vec4' || type === 'uvec4' || type === 'ivec4' ) value = new Vector4();
+			else if ( type === 'vec2' || type === 'uvec2' || type === 'ivec2' || type === 'bvec2' ) value = new Vector2();
+			else if ( type === 'vec3' || type === 'uvec3' || type === 'ivec3' || type === 'bvec3' ) value = new Vector3();
+			else if ( type === 'vec4' || type === 'uvec4' || type === 'ivec4' || type === 'bvec4' ) value = new Vector4();
 
 		}
 
-		if ( type === 'float' ) return toFloat( value );
-		if ( type === 'int' ) return `${ Math.round( value ) }`;
-		if ( type === 'uint' ) return value >= 0 ? `${ Math.round( value ) }u` : '0u';
+		if ( type === 'float' ) return _toFloat( value );
+		if ( type === 'int' ) return `${ Math.trunc( value ) }`;
+		if ( type === 'uint' ) return value >= 0 ? `${ Math.trunc( value ) }u` : '0u';
 		if ( type === 'bool' ) return value ? 'true' : 'false';
-		if ( type === 'color' ) return `${ this.getType( 'vec3' ) }( ${ toFloat( value.r ) }, ${ toFloat( value.g ) }, ${ toFloat( value.b ) } )`;
+		if ( type === 'color' ) return `${ this.getType( 'vec3' ) }( ${ _toFloat( value.r ) }, ${ _toFloat( value.g ) }, ${ _toFloat( value.b ) } )`;
 
 		const typeLength = this.getTypeLength( type );
 
@@ -1302,7 +1599,7 @@ class NodeBuilder {
 
 		}
 
-		throw new Error( `NodeBuilder: Type '${type}' not found in generate constant attempt.` );
+		throw new Error( `THREE.NodeBuilder: Type '${type}' not found in generate constant attempt.` );
 
 	}
 
@@ -1382,6 +1679,32 @@ class NodeBuilder {
 	}
 
 	/**
+	 * Whether the given type is a scalar type or not.
+	 *
+	 * @param {string} type - The type to check.
+	 * @return {boolean} Whether the given type is a scalar type or not.
+	 */
+	isScalar( type ) {
+
+		return type === 'float' || type === 'bool' || type === 'int' || type === 'uint';
+
+	}
+
+	/**
+	 * Returns whether the given name is a reserved keyword of the backend's
+	 * shading language. Backends override this method to provide their
+	 * language-specific keywords.
+	 *
+	 * @param {string} name - The name to test.
+	 * @return {boolean} Whether the name is a reserved keyword or not.
+	 */
+	isReservedKeyword( /* name */ ) {
+
+		return false;
+
+	}
+
+	/**
 	 * Whether the given type is a vector type or not.
 	 *
 	 * @param {string} type - The type to check.
@@ -1389,7 +1712,9 @@ class NodeBuilder {
 	 */
 	isVector( type ) {
 
-		return /vec\d/.test( type );
+		let result = _isVectorCache.get( type );
+		if ( result === undefined ) _isVectorCache.set( type, result = /vec\d/.test( type ) );
+		return result;
 
 	}
 
@@ -1401,7 +1726,9 @@ class NodeBuilder {
 	 */
 	isMatrix( type ) {
 
-		return /mat\d/.test( type );
+		let result = _isMatrixCache.get( type );
+		if ( result === undefined ) _isMatrixCache.set( type, result = /mat\d/.test( type ) );
+		return result;
 
 	}
 
@@ -1440,12 +1767,10 @@ class NodeBuilder {
 
 		const type = texture.type;
 
-		if ( texture.isDataTexture ) {
+		if ( texture.isDepthTexture === true ) return 'float';
 
-			if ( type === IntType ) return 'int';
-			if ( type === UnsignedIntType ) return 'uint';
-
-		}
+		if ( type === IntType ) return 'int';
+		if ( type === UnsignedIntType ) return 'uint';
 
 		return 'float';
 
@@ -1479,15 +1804,23 @@ class NodeBuilder {
 
 		if ( type === 'float' || type === 'bool' || type === 'int' || type === 'uint' ) return type;
 
-		const componentType = /(b|i|u|)(vec|mat)([2-4])/.exec( type );
+		let result = _componentTypeCache.get( type );
 
-		if ( componentType === null ) return null;
+		if ( result === undefined ) {
 
-		if ( componentType[ 1 ] === 'b' ) return 'bool';
-		if ( componentType[ 1 ] === 'i' ) return 'int';
-		if ( componentType[ 1 ] === 'u' ) return 'uint';
+			const componentType = /(b|i|u|)(vec|mat)([2-4])/.exec( type );
 
-		return 'float';
+			if ( componentType === null ) result = null;
+			else if ( componentType[ 1 ] === 'b' ) result = 'bool';
+			else if ( componentType[ 1 ] === 'i' ) result = 'int';
+			else if ( componentType[ 1 ] === 'u' ) result = 'uint';
+			else result = 'float';
+
+			_componentTypeCache.set( type, result );
+
+		}
+
+		return result;
 
 	}
 
@@ -1551,7 +1884,9 @@ class NodeBuilder {
 	 */
 	isInteger( type ) {
 
-		return /int|uint|(i|u)vec/.test( type );
+		let result = _isIntegerCache.get( type );
+		if ( result === undefined ) _isIntegerCache.set( type, result = /int|uint|(i|u)vec/.test( type ) );
+		return result;
 
 	}
 
@@ -1592,6 +1927,24 @@ class NodeBuilder {
 	getTypeLength( type ) {
 
 		const vecType = this.getVectorType( type );
+
+		let length = _typeLengthCache.get( vecType );
+
+		if ( length === undefined ) {
+
+			length = this._getTypeLength( vecType );
+
+			_typeLengthCache.set( vecType, length );
+
+		}
+
+		return length;
+
+	}
+
+	_getTypeLength( type ) {
+
+		const vecType = type;
 		const vecNum = /vec([2-4])/.exec( vecType );
 
 		if ( vecNum !== null ) return Number( vecNum[ 1 ] );
@@ -1628,6 +1981,52 @@ class NodeBuilder {
 	changeComponentType( type, newComponentType ) {
 
 		return this.getTypeFromLength( this.getTypeLength( type ), newComponentType );
+
+	}
+
+	/**
+	 * Returns the common component type of the input nodes. Explicit types are
+	 * promoted first, then weak constants adopt that type, being truncated like other
+	 * integer constants. Only weak constants out of the integer range promote it.
+	 * Inputs consisting only of weak constants default to float.
+	 *
+	 * @param {...?Node} nodes - The input nodes.
+	 * @return {string} The promoted component type.
+	 */
+	getPromotedComponentType( ...nodes ) {
+
+		let type = null;
+		let hasWeak = false;
+		let fitsUint = true;
+		let fitsInt = true;
+
+		for ( const node of nodes ) {
+
+			if ( node === null ) continue;
+
+			if ( node.isWeak === true ) {
+
+				const value = Math.trunc( node.value );
+
+				hasWeak = true;
+				fitsUint = fitsUint && value >= 0 && value <= 0xffffffff;
+				fitsInt = fitsInt && value >= - 0x80000000 && value <= 0x7fffffff;
+
+			} else {
+
+				const componentType = this.getComponentType( node.getNodeType( this ) );
+
+				if ( type === null || _componentTypeRanks[ componentType ] > _componentTypeRanks[ type ] ) type = componentType;
+
+			}
+
+		}
+
+		if ( type === null || ( type === 'bool' && hasWeak ) ) return 'float';
+		if ( type === 'uint' && fitsUint === false ) return fitsInt ? 'int' : 'float';
+		if ( type === 'int' && fitsInt === false ) return 'float';
+
+		return type;
 
 	}
 
@@ -1671,7 +2070,7 @@ class NodeBuilder {
 
 		} else {
 
-			throw new Error( 'NodeBuilder: Invalid active stack removal.' );
+			throw new Error( 'THREE.NodeBuilder: Invalid active stack removal.' );
 
 		}
 
@@ -1696,6 +2095,55 @@ class NodeBuilder {
 	getBaseStack() {
 
 		return this.activeStacks[ 0 ];
+
+	}
+
+	/**
+	 * Creates a block that repeats its code, e.g. a loop body, used in the current context.
+	 * The block keeps its parent block, the context and its position in the active stack.
+	 *
+	 * @return {Object} The code block.
+	 */
+	createBlock() {
+
+		const stack = this.getActiveStack();
+
+		return {
+			parent: this.context.nodeBlock || null,
+			context: this.context,
+			stack,
+			node: stack !== undefined ? stack._currentNode : undefined
+		};
+
+	}
+
+	/**
+	 * Declares a node outside of the stacks of this build, e.g. created outside of a function, before the outermost
+	 * block that would repeat it, e.g. a loop body. Blocks set up in another build or with context overrides of the
+	 * current one are kept, since the node could have another value in them.
+	 *
+	 * @param {Node} node - The node to declare.
+	 * @return {StackNode|undefined} The stack where the node was declared.
+	 */
+	declareBeforeBlock( node ) {
+
+		if ( this.flowBlock !== null ) return;
+
+		let block;
+
+		for ( let nodeBlock = this.context.nodeBlock; nodeBlock; nodeBlock = nodeBlock.parent ) {
+
+			if ( this.activeStacks.includes( nodeBlock.stack ) === false || _hasContextOverrides( this.context, nodeBlock.context ) ) break;
+
+			block = nodeBlock;
+
+		}
+
+		if ( block === undefined || this.activeStacks.some( activeStack => activeStack.nodes.includes( node ) ) ) return;
+
+		block.stack.addToStackBefore( node, block.node );
+
+		return block.stack;
 
 	}
 
@@ -1764,11 +2212,13 @@ class NodeBuilder {
 
 		}
 
-		if ( nodeData[ shaderStage ] === undefined ) nodeData[ shaderStage ] = {};
+		if ( nodeData[ shaderStage ] === undefined ) nodeData[ shaderStage ] = new NodeData();
 
 		//
 
 		let data = nodeData[ shaderStage ];
+
+		if ( this.subBuildLayers.length === 0 ) return data;
 
 		const subBuilds = nodeData.any ? nodeData.any.subBuilds : null;
 		const subBuild = this.getClosestSubBuild( subBuilds );
@@ -1777,7 +2227,7 @@ class NodeBuilder {
 
 			if ( data.subBuildsCache === undefined ) data.subBuildsCache = {};
 
-			data = data.subBuildsCache[ subBuild ] || ( data.subBuildsCache[ subBuild ] = {} );
+			data = data.subBuildsCache[ subBuild ] || ( data.subBuildsCache[ subBuild ] = new NodeData() );
 			data.subBuilds = subBuilds;
 
 		}
@@ -1811,9 +2261,10 @@ class NodeBuilder {
 	 *
 	 * @param {BufferAttributeNode} node - The buffer attribute node.
 	 * @param {string} type - The node type.
+	 * @param {?string} [name=null] - The name of the buffer attribute.
 	 * @return {NodeAttribute} The node attribute.
 	 */
-	getBufferAttributeFromNode( node, type ) {
+	getBufferAttributeFromNode( node, type, name = null ) {
 
 		const nodeData = this.getDataFromNode( node, 'vertex' );
 
@@ -1823,7 +2274,13 @@ class NodeBuilder {
 
 			const index = this.uniforms.index ++;
 
-			bufferAttribute = new NodeAttribute( 'nodeAttribute' + index, type, node );
+			if ( name === null ) {
+
+				name = 'nodeAttribute' + index;
+
+			}
+
+			bufferAttribute = new NodeAttribute( name, type, node );
 
 			this.bufferAttributes.push( bufferAttribute );
 
@@ -1940,13 +2397,15 @@ class NodeBuilder {
 	 * @param {string} [type=node.getNodeType( this )] - The variable's type.
 	 * @param {('vertex'|'fragment'|'compute'|'any')} [shaderStage=this.shaderStage] - The shader stage.
 	 * @param {boolean} [readOnly=false] - Whether the variable is read-only or not.
+	 * @param {boolean} [local=false] - Whether the variable is declared locally in the flow instead of the variable section.
+	 * @param {string} [property='variable'] - The node data property that holds the variable. Allows a node to own more than one variable.
 	 *
 	 * @return {NodeVar} The node variable.
 	 */
-	getVarFromNode( node, name = null, type = node.getNodeType( this ), shaderStage = this.shaderStage, readOnly = false ) {
+	getVarFromNode( node, name = null, type = node.getNodeType( this ), shaderStage = this.shaderStage, readOnly = false, local = false, property = 'variable' ) {
 
 		const nodeData = this.getDataFromNode( node, shaderStage );
-		const subBuildVariable = this.getSubBuildProperty( 'variable', nodeData.subBuilds );
+		const subBuildVariable = this.getSubBuildProperty( property, nodeData.subBuilds );
 
 		let nodeVar = nodeData[ subBuildVariable ];
 
@@ -1967,7 +2426,7 @@ class NodeBuilder {
 
 			//
 
-			if ( subBuildVariable !== 'variable' ) {
+			if ( subBuildVariable !== property ) {
 
 				name = this.getSubBuildProperty( name, nodeData.subBuilds );
 
@@ -1977,9 +2436,9 @@ class NodeBuilder {
 
 			const count = node.getArrayCount( this );
 
-			nodeVar = new NodeVar( name, type, readOnly, count );
+			nodeVar = new NodeVar( name, type, readOnly, count, local );
 
-			if ( ! readOnly ) {
+			if ( ! readOnly && ! local ) {
 
 				vars.push( nodeVar );
 
@@ -2002,6 +2461,12 @@ class NodeBuilder {
 	 * @return {boolean} Returns true if deterministic.
 	 */
 	isDeterministic( node ) {
+
+		if ( node.isVarNode && node.assignable ) {
+
+			node = node.node;
+
+		}
 
 		if ( node.isMathNode ) {
 
@@ -2099,29 +2564,44 @@ class NodeBuilder {
 
 		const shaderStage = this.shaderStage;
 		const declarations = this.declarations[ shaderStage ] || ( this.declarations[ shaderStage ] = {} );
+		const checkKeywords = this.renderer.debug.diagnostics.keywords;
 
-		const property = this.getPropertyName( node );
+		const baseName = node.name;
 
+		let name = baseName;
+		let declarationName = this.getDeclarationName( node );
 		let index = 1;
-		let name = property;
 
-		// Automatically renames the property if the name is already in use.
+		// Automatically renames the property if the name is already in use or reserved.
 
-		while ( declarations[ name ] !== undefined ) {
+		while ( ( checkKeywords && this.isReservedKeyword( name ) ) || declarations[ declarationName ] !== undefined ) {
 
-			name = property + '_' + index ++;
-
-		}
-
-		if ( index > 1 ) {
-
+			name = baseName + '_' + index ++;
 			node.name = name;
-
-			warn( `TSL: Declaration name '${ property }' of '${ node.type }' already in use. Renamed to '${ name }'.` );
+			declarationName = this.getDeclarationName( node );
 
 		}
 
-		declarations[ name ] = node;
+		if ( name !== baseName ) {
+
+			warn( `TSL: Declaration name '${ baseName }' of '${ node.type }' is a reserved keyword or already in use. Renamed to '${ name }'.` );
+
+		}
+
+		declarations[ declarationName ] = node;
+
+	}
+
+	/**
+	 * Returns the identifier the given node declares in the shader. It is used
+	 * by {@link NodeBuilder#registerDeclaration} to detect name collisions.
+	 *
+	 * @param {Object} node - The node.
+	 * @return {string} The declaration name.
+	 */
+	getDeclarationName( node ) {
+
+		return this.getPropertyName( node );
 
 	}
 
@@ -2157,84 +2637,19 @@ class NodeBuilder {
 	}
 
 	/**
-	 * Adds a code flow based on the code-block hierarchy.
-
-	 * This is used so that code-blocks like If,Else create their variables locally if the Node
-	 * is only used inside one of these conditionals in the current shader stage.
-	 *
-	 * @param {Node} node - The node to add.
-	 * @param {Node} nodeBlock - Node-based code-block. Usually 'ConditionalNode'.
-	 */
-	addFlowCodeHierarchy( node, nodeBlock ) {
-
-		const { flowCodes, flowCodeBlock } = this.getDataFromNode( node );
-
-		let needsFlowCode = true;
-		let nodeBlockHierarchy = nodeBlock;
-
-		while ( nodeBlockHierarchy ) {
-
-			if ( flowCodeBlock.get( nodeBlockHierarchy ) === true ) {
-
-				needsFlowCode = false;
-				break;
-
-			}
-
-			nodeBlockHierarchy = this.getDataFromNode( nodeBlockHierarchy ).parentNodeBlock;
-
-		}
-
-		if ( needsFlowCode ) {
-
-			for ( const flowCode of flowCodes ) {
-
-				this.addLineFlowCode( flowCode );
-
-			}
-
-		}
-
-	}
-
-	/**
-	 * Add a inline-code to the current flow code-block.
-	 *
-	 * @param {Node} node - The node to add.
-	 * @param {string} code - The code to add.
-	 * @param {Node} nodeBlock - Current ConditionalNode
-	 */
-	addLineFlowCodeBlock( node, code, nodeBlock ) {
-
-		const nodeData = this.getDataFromNode( node );
-		const flowCodes = nodeData.flowCodes || ( nodeData.flowCodes = [] );
-		const codeBlock = nodeData.flowCodeBlock || ( nodeData.flowCodeBlock = new WeakMap() );
-
-		flowCodes.push( code );
-		codeBlock.set( nodeBlock, true );
-
-	}
-
-	/**
 	 * Add a inline-code to the current flow.
 	 *
 	 * @param {string} code - The code to add.
-	 * @param {?Node} [node= null] - Optional Node, can help the system understand if the Node is part of a code-block.
+	 * @param {?Node} [node= null] - The node that generated the code.
 	 * @return {NodeBuilder} A reference to this node builder.
 	 */
-	addLineFlowCode( code, node = null ) {
+	addLineFlowCode( code /*, node = null */ ) {
 
 		if ( code === '' ) return this;
 
-		if ( node !== null && this.context.nodeBlock ) {
-
-			this.addLineFlowCodeBlock( node, code, this.context.nodeBlock );
-
-		}
-
 		code = this.tab + code;
 
-		if ( ! /;\s*$/.test( code ) ) {
+		if ( code.trimEnd().endsWith( ';' ) === false ) {
 
 			code = code + ';\n';
 
@@ -2326,7 +2741,7 @@ class NodeBuilder {
 	 */
 	addInclude( node ) {
 
-		if ( this.currentFunctionNode !== null ) {
+		if ( this.currentFunctionNode !== null && this.currentFunctionNode.includes.includes( node ) === false ) {
 
 			this.currentFunctionNode.includes.push( node );
 
@@ -2343,15 +2758,34 @@ class NodeBuilder {
 	 */
 	buildFunctionNode( shaderNode ) {
 
-		const fn = new FunctionNode();
+		const backend = this.renderer.backend;
 
-		const previous = this.currentFunctionNode;
+		let cache = _functionNodeCache.get( backend );
 
-		this.currentFunctionNode = fn;
+		if ( cache === undefined ) {
 
-		fn.code = this.buildFunctionCode( shaderNode );
+			cache = new WeakMap();
+			_functionNodeCache.set( backend, cache );
 
-		this.currentFunctionNode = previous;
+		}
+
+		let fn = cache.get( shaderNode );
+
+		if ( fn === undefined ) {
+
+			fn = new FunctionNode();
+
+			const previous = this.currentFunctionNode;
+
+			this.currentFunctionNode = fn;
+
+			fn.code = this.buildFunctionCode( shaderNode );
+
+			this.currentFunctionNode = previous;
+
+			cache.set( shaderNode, fn );
+
+		}
 
 		return fn;
 
@@ -2367,26 +2801,7 @@ class NodeBuilder {
 
 		const layout = shaderNode.layout;
 
-		const inputs = {
-			[ Symbol.iterator ]() {
-
-				let index = 0;
-				const values = Object.values( this );
-				return {
-					next: () => ( {
-						value: values[ index ],
-						done: index ++ >= values.length
-					} )
-				};
-
-			}
-		};
-
-		for ( const input of layout.inputs ) {
-
-			inputs[ input.name ] = new ParameterNode( input.type, input.name );
-
-		}
+		const inputs = _createLayoutInputs( layout, layout.inputs.map( input => new ParameterNode( input.type, input.name ) ) );
 
 		//
 
@@ -2398,6 +2813,217 @@ class NodeBuilder {
 		shaderNode.layout = layout;
 
 		return flowData;
+
+	}
+
+	/**
+	 * Returns the inputs of a call to a TSL function with layout. Missing inputs are completed
+	 * with the default values of the function parameters, found by running the function once
+	 * with all inputs and once without the missing ones, and comparing both node graphs.
+	 *
+	 * @private
+	 * @param {ShaderNodeInternal} shaderNode - The shader node of the function.
+	 * @param {?Array} rawInputs - The inputs of the call.
+	 * @return {?Array} The inputs of the call, or `null` if the defaults can't be resolved and the function must be expanded inline.
+	 */
+	_getLayoutInputs( shaderNode, rawInputs ) {
+
+		const inputs = shaderNode.layout.inputs;
+
+		const firstInput = rawInputs !== null && rawInputs.length > 0 ? rawInputs[ 0 ] : null;
+		const object = firstInput !== null && firstInput !== undefined && isArrayAsParameter( rawInputs ) === false ? firstInput : null;
+		const provided = inputs.map( ( input, i ) => object !== null ? object[ input.name ] !== undefined : rawInputs !== null && rawInputs[ i ] !== undefined );
+
+		if ( provided.every( Boolean ) ) return rawInputs !== null ? rawInputs : [];
+
+		if ( shaderNode.once ) return null;
+
+		// The defaults only depend on which inputs are missing, so they are shared by all builders.
+
+		let cache = _layoutDefaultsCache.get( shaderNode );
+
+		if ( cache === undefined ) {
+
+			cache = new Map();
+			_layoutDefaultsCache.set( shaderNode, cache );
+
+		}
+
+		const key = provided.map( Number ).join( '' );
+
+		let defaults = cache.get( key );
+
+		if ( defaults === undefined ) {
+
+			defaults = this._resolveLayoutDefaults( shaderNode, provided );
+			cache.set( key, defaults );
+
+		}
+
+		if ( defaults === null ) return null;
+
+		if ( object !== null ) {
+
+			const completed = { ...object };
+
+			inputs.forEach( ( input, i ) => {
+
+				if ( provided[ i ] === false ) completed[ input.name ] = defaults[ i ];
+
+			} );
+
+			return [ completed ];
+
+		}
+
+		return provided.map( ( isProvided, i ) => isProvided ? rawInputs[ i ] : defaults[ i ] );
+
+	}
+
+	/**
+	 * Resolves the default values of the missing inputs of a TSL function with layout.
+	 *
+	 * @private
+	 * @param {ShaderNodeInternal} shaderNode - The shader node of the function.
+	 * @param {Array<boolean>} provided - Whether each input of the layout was provided.
+	 * @return {?Array<Node>} The default value of each missing input, or `null` if they could not be resolved.
+	 */
+	_resolveLayoutDefaults( shaderNode, provided ) {
+
+		const layout = shaderNode.layout;
+		const parameters = layout.inputs.map( input => new ParameterNode( input.type, input.name ) );
+
+		const fullGraph = this._getLayoutCallGraph( shaderNode, _createLayoutInputs( layout, parameters ) );
+		const partialGraph = this._getLayoutCallGraph( shaderNode, _createLayoutInputs( layout, parameters.map( ( parameter, i ) => provided[ i ] ? parameter : undefined ) ) );
+
+		// Walk both graphs together: where the full graph uses the parameter of a missing input,
+		// the partial graph uses its default value.
+
+		const missing = new Map();
+		parameters.forEach( ( parameter, i ) => {
+
+			if ( provided[ i ] === false ) missing.set( parameter, i );
+
+		} );
+
+		const defaults = [];
+		const visited = new Map();
+
+		const walk = ( a, b ) => {
+
+			if ( a === b ) return true;
+			if ( ! a || ! b || a.isNode !== true || b.isNode !== true ) return false;
+
+			const index = missing.get( a );
+
+			if ( index !== undefined ) {
+
+				if ( defaults[ index ] === undefined ) defaults[ index ] = b;
+
+				return defaults[ index ] === b;
+
+			}
+
+			if ( visited.has( a ) ) return visited.get( a ) === b;
+			if ( a.constructor !== b.constructor ) return false;
+
+			visited.set( a, b );
+
+			const childrenA = [ ...a.getChildren() ];
+			const childrenB = [ ...b.getChildren() ];
+
+			if ( childrenA.length !== childrenB.length ) return false;
+
+			for ( let i = 0; i < childrenA.length; i ++ ) {
+
+				if ( walk( childrenA[ i ], childrenB[ i ] ) === false ) return false;
+
+			}
+
+			return true;
+
+		};
+
+		// The default values are evaluated when the parameters are destructured, before the body,
+		// so the nodes they add to the stack come first. Align the body statements from the end.
+
+		const extra = partialGraph.nodes.length - fullGraph.nodes.length;
+
+		if ( extra < 0 ) return null;
+
+		visited.set( fullGraph, partialGraph );
+
+		if ( walk( fullGraph.outputNode, partialGraph.outputNode ) === false ) return null;
+
+		for ( let i = 0; i < fullGraph.nodes.length; i ++ ) {
+
+			if ( walk( fullGraph.nodes[ i ], partialGraph.nodes[ extra + i ] ) === false ) return null;
+
+		}
+
+		// Every missing input must have a default that does not depend on other parameters.
+
+		const parameterSet = new Set( parameters );
+
+		for ( const index of missing.values() ) {
+
+			const value = defaults[ index ];
+
+			if ( value === undefined ) return null;
+
+			const stack = [ value ];
+			const seen = new Set();
+
+			while ( stack.length > 0 ) {
+
+				const node = stack.pop();
+
+				if ( parameterSet.has( node ) ) return null;
+				if ( seen.has( node ) ) continue;
+
+				seen.add( node );
+
+				for ( const child of node.getChildren() ) stack.push( child );
+
+			}
+
+		}
+
+		return defaults;
+
+	}
+
+	/**
+	 * Runs a TSL function with layout as an inline call and returns the resulting stack.
+	 *
+	 * @private
+	 * @param {ShaderNodeInternal} shaderNode - The shader node of the function.
+	 * @param {Object} inputs - The inputs of the call.
+	 * @return {StackNode} The stack with the nodes of the call.
+	 */
+	_getLayoutCallGraph( shaderNode, inputs ) {
+
+		const layout = shaderNode.layout;
+
+		let graph;
+
+		shaderNode.layout = null;
+
+		this.addStack();
+
+		try {
+
+			this.stack.outputNode = shaderNode.call( inputs ).call( this );
+
+		} finally {
+
+			graph = this.removeStack();
+
+			shaderNode.layout = layout;
+
+		}
+
+		return graph;
 
 	}
 
@@ -2444,6 +3070,7 @@ class NodeBuilder {
 		const previousCache = this.cache;
 		const previousBuildStage = this.buildStage;
 		const previousStack = this.stack;
+		const previousFlowBlock = this.flowBlock;
 
 		const flow = {
 			code: ''
@@ -2454,6 +3081,7 @@ class NodeBuilder {
 		this.declarations = {};
 		this.cache = new NodeCache();
 		this.stack = stack();
+		this.flowBlock = null;
 
 		for ( const buildStage of defaultBuildStages ) {
 
@@ -2470,6 +3098,7 @@ class NodeBuilder {
 		this.declarations = previousDeclarations;
 		this.cache = previousCache;
 		this.stack = previousStack;
+		this.flowBlock = previousFlowBlock;
 
 		this.setBuildStage( previousBuildStage );
 
@@ -2547,12 +3176,14 @@ class NodeBuilder {
 		const previousCache = this.cache;
 		const previousShaderStage = this.shaderStage;
 		const previousContext = this.context;
+		const previousFlowBlock = this.flowBlock;
 
 		this.setShaderStage( shaderStage );
 
 		const context = { ...this.context };
 		delete context.nodeBlock;
 
+		this.flowBlock = null;
 		this.cache = this.globalCache;
 		this.tab = '\t';
 		this.context = context;
@@ -2584,6 +3215,7 @@ class NodeBuilder {
 		this.cache = previousCache;
 		this.tab = previousTab;
 		this.context = previousContext;
+		this.flowBlock = previousFlowBlock;
 
 		return result;
 
@@ -2641,14 +3273,58 @@ class NodeBuilder {
 	}
 
 	/**
+	 * Returns a single const variable statement as a shader string for the given variable type and name.
+	 *
+	 * @param {string} type - The variable's type.
+	 * @param {string} name - The variable's name.
+	 * @param {?number} [count=null] - The array length.
+	 * @return {string} The shader string.
+	 */
+	generateConstStatement( type, name, count = null ) {
+
+		return `const ${ this.getVar( type, name, count ) }`;
+
+	}
+
+	/**
+	 * Returns a single variable statement as a shader string for the given variable type and name.
+	 *
+	 * @param {string} type - The variable's type.
+	 * @param {string} name - The variable's name.
+	 * @param {?number} [count=null] - The array length.
+	 * @return {string} The shader string.
+	 */
+	generateVarStatement( type, name, count = null ) {
+
+		return this.getVar( type, name, count );
+
+	}
+
+	/**
+	 * Returns a runtime read-only variable statement as a shader string.
+	 * Backends without a let declaration use a regular variable declaration.
+	 *
+	 * @param {string} type - The variable's type.
+	 * @param {string} name - The variable's name.
+	 * @param {?number} [count=null] - The array length.
+	 * @return {string} The shader string.
+	 */
+	generateLetStatement( type, name, count = null ) {
+
+		return this.generateVarStatement( type, name, count );
+
+	}
+
+	/**
 	 * Returns the variable definitions as a shader string for the given shader stage.
 	 *
 	 * @param {('vertex'|'fragment'|'compute'|'any')} shaderStage - The shader stage.
+	 * @param {boolean} [global=false] - Whether the variables are global.
 	 * @return {string} The variable code section.
 	 */
-	getVars( shaderStage ) {
+	getVars( shaderStage, global = false ) {
 
-		let snippet = '';
+		const snippets = [];
 
 		const vars = this.vars[ shaderStage ];
 
@@ -2656,13 +3332,13 @@ class NodeBuilder {
 
 			for ( const variable of vars ) {
 
-				snippet += `${ this.getVar( variable.type, variable.name ) }; `;
+				snippets.push( `${ this.getVar( variable.type, variable.name, variable.count ) };` );
 
 			}
 
 		}
 
-		return snippet;
+		return snippets.join( global ? '\n' : '\n\t' );
 
 	}
 
@@ -2911,13 +3587,41 @@ class NodeBuilder {
 	}
 
 	/**
-	 * Central build method which controls the build for the given object.
-	 *
-	 * @return {NodeBuilder} A reference to this node builder.
+	 * Prebuild the node builder.
 	 */
-	build() {
+	prebuild() {
 
-		const { object, material, renderer } = this;
+		const { renderer, material } = this;
+
+		// < renderer.contextNode >
+
+		if ( renderer.contextNode.isContextNode === true ) {
+
+			this.addContext( renderer.contextNode.getFlowContextData() );
+
+		} else {
+
+			error( 'NodeBuilder: "renderer.contextNode" must be an instance of `context()`.' );
+
+		}
+
+		// < material.contextNode >
+
+		if ( material && material.contextNode ) {
+
+			if ( material.contextNode.isContextNode === true ) {
+
+				this.addContext( material.contextNode.getFlowContextData() );
+
+			} else {
+
+				error( 'NodeBuilder: "material.contextNode" must be an instance of `context()`.' );
+
+			}
+
+		}
+
+		// < nodeMaterial >
 
 		if ( material !== null ) {
 
@@ -2925,7 +3629,7 @@ class NodeBuilder {
 
 			if ( nodeMaterial === null ) {
 
-				error( `NodeMaterial: Material "${ material.type }" is not compatible.` );
+				error( `NodeBuilder: Material "${ material.type }" is not compatible.` );
 
 				nodeMaterial = new NodeMaterial();
 
@@ -2935,9 +3639,20 @@ class NodeBuilder {
 
 		} else {
 
-			this.addFlow( 'compute', object );
+			this.addFlow( 'compute', this.compute );
 
 		}
+
+	}
+
+	/**
+	 * Central build method which controls the build for the given object.
+	 *
+	 * @return {NodeBuilder} A reference to this node builder.
+	 */
+	build() {
+
+		this.prebuild();
 
 		// setup() -> stage 1: create possible new nodes and/or return an output reference node
 		// analyze()   -> stage 2: analyze nodes to possible optimization and validation
@@ -2990,22 +3705,66 @@ class NodeBuilder {
 	}
 
 	/**
-	 * Returns shared data object for the given node.
+	 * Async version of build() that yields to main thread between shader stages.
+	 * Use this in compileAsync() to prevent blocking the main thread.
 	 *
-	 * @param {Node} node - The node to get shared data from.
-	 * @return {Object} The shared data.
+	 * @param {Function} [yieldFn=yieldToMain] - The function used to yield to the main thread.
+	 * @return {Promise<NodeBuilder>} A promise that resolves to this node builder.
 	 */
-	getSharedDataFromNode( node ) {
+	async buildAsync( yieldFn = yieldToMain ) {
 
-		let data = sharedNodeData.get( node );
+		this.prebuild();
 
-		if ( data === undefined ) {
+		// setup() -> stage 1: create possible new nodes and/or return an output reference node
+		// analyze()   -> stage 2: analyze nodes to possible optimization and validation
+		// generate()  -> stage 3: generate shader
 
-			data = {};
+		for ( const buildStage of defaultBuildStages ) {
+
+			this.setBuildStage( buildStage );
+
+			if ( this.context.position && this.context.position.isNode ) {
+
+				this.flowNodeFromShaderStage( 'vertex', this.context.position );
+
+			}
+
+			for ( const shaderStage of shaderStages ) {
+
+				this.setShaderStage( shaderStage );
+
+				const flowNodes = this.flowNodes[ shaderStage ];
+
+				for ( const node of flowNodes ) {
+
+					if ( buildStage === 'generate' ) {
+
+						this.flowNode( node );
+
+					} else {
+
+						node.build( this );
+
+					}
+
+				}
+
+				// Yield to main thread after each shader stage to prevent blocking
+				await yieldFn();
+
+			}
 
 		}
 
-		return data;
+		this.setBuildStage( null );
+		this.setShaderStage( null );
+
+		// stage 4: build code for a specific output
+
+		this.buildCode();
+		this.buildUpdateNodes();
+
+		return this;
 
 	}
 
@@ -3018,31 +3777,16 @@ class NodeBuilder {
 	 */
 	getNodeUniform( uniformNode, type ) {
 
-		const nodeData = this.getSharedDataFromNode( uniformNode );
+		if ( type === 'float' || type === 'int' || type === 'uint' ) return new NumberNodeUniform( uniformNode );
+		if ( type === 'vec2' || type === 'ivec2' || type === 'uvec2' ) return new Vector2NodeUniform( uniformNode );
+		if ( type === 'vec3' || type === 'ivec3' || type === 'uvec3' ) return new Vector3NodeUniform( uniformNode );
+		if ( type === 'vec4' || type === 'ivec4' || type === 'uvec4' ) return new Vector4NodeUniform( uniformNode );
+		if ( type === 'color' ) return new ColorNodeUniform( uniformNode );
+		if ( type === 'mat2' ) return new Matrix2NodeUniform( uniformNode );
+		if ( type === 'mat3' ) return new Matrix3NodeUniform( uniformNode );
+		if ( type === 'mat4' ) return new Matrix4NodeUniform( uniformNode );
 
-		let node = nodeData.cache;
-
-		if ( node === undefined ) {
-
-			if ( type === 'float' || type === 'int' || type === 'uint' ) node = new NumberNodeUniform( uniformNode );
-			else if ( type === 'vec2' || type === 'ivec2' || type === 'uvec2' ) node = new Vector2NodeUniform( uniformNode );
-			else if ( type === 'vec3' || type === 'ivec3' || type === 'uvec3' ) node = new Vector3NodeUniform( uniformNode );
-			else if ( type === 'vec4' || type === 'ivec4' || type === 'uvec4' ) node = new Vector4NodeUniform( uniformNode );
-			else if ( type === 'color' ) node = new ColorNodeUniform( uniformNode );
-			else if ( type === 'mat2' ) node = new Matrix2NodeUniform( uniformNode );
-			else if ( type === 'mat3' ) node = new Matrix3NodeUniform( uniformNode );
-			else if ( type === 'mat4' ) node = new Matrix4NodeUniform( uniformNode );
-			else {
-
-				throw new Error( `Uniform "${ type }" not implemented.` );
-
-			}
-
-			nodeData.cache = node;
-
-		}
-
-		return node;
+		throw new Error( `THREE.NodeBuilder: Uniform "${ type }" not implemented.` );
 
 	}
 
@@ -3115,13 +3859,19 @@ class NodeBuilder {
 
 		if ( toTypeLength === 4 && fromTypeLength > 1 ) { // toType is vec4-like
 
-			return `${ this.getType( toType ) }( ${ this.format( snippet, fromType, 'vec3' ) }, 1.0 )`;
+			const componentType = this.getComponentType( toType );
+			const vectorType = this.getTypeFromLength( 3, componentType );
+
+			return `${ this.getType( toType ) }( ${ this.format( snippet, fromType, vectorType ) }, ${ this.generateConst( componentType, componentType === 'bool' ? true : 1 ) } )`;
 
 		}
 
 		if ( fromTypeLength === 2 ) { // fromType is vec2-like and toType is vec3-like
 
-			return `${ this.getType( toType ) }( ${ this.format( snippet, fromType, 'vec2' ) }, 0.0 )`;
+			const componentType = this.getComponentType( toType );
+			const vectorType = this.getTypeFromLength( 2, componentType );
+
+			return `${ this.getType( toType ) }( ${ this.format( snippet, fromType, vectorType ) }, ${ this.generateConst( componentType, componentType === 'bool' ? false : 0 ) } )`;
 
 		}
 
@@ -3159,7 +3909,7 @@ class NodeBuilder {
 
 		const mrt = this.renderer.getMRT();
 
-		return ( mrt && mrt.has( 'velocity' ) ) || getDataFromObject( this.object ).useVelocity === true;
+		return ( mrt !== null && mrt.has( 'velocity' ) );
 
 	}
 

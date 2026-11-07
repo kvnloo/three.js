@@ -58,6 +58,12 @@ class FunctionOverloadingNode extends Node {
 
 	}
 
+	isCacheable( /*builder*/ ) {
+
+		return false;
+
+	}
+
 	/**
 	 * This method is overwritten since the node type is inferred from
 	 * the function's return type.
@@ -65,7 +71,7 @@ class FunctionOverloadingNode extends Node {
 	 * @param {NodeBuilder} builder - The current node builder.
 	 * @return {string} The node type.
 	 */
-	getNodeType( builder ) {
+	generateNodeType( builder ) {
 
 		const candidateFn = this.getCandidateFn( builder );
 
@@ -97,7 +103,7 @@ class FunctionOverloadingNode extends Node {
 
 				if ( layout === null ) {
 
-					throw new Error( 'FunctionOverloadingNode: FunctionNode must be a layout.' );
+					throw new Error( 'THREE.FunctionOverloadingNode: FunctionNode must be a layout.' );
 
 				}
 
@@ -112,7 +118,7 @@ class FunctionOverloadingNode extends Node {
 						const param = params[ i ];
 						const input = inputs[ i ];
 
-						if ( param.getNodeType( builder ) === input.type ) {
+						if ( builder.getVectorType( param.getNodeType( builder ) ) === input.type ) {
 
 							currentScore ++;
 

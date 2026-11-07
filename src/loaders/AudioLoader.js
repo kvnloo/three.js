@@ -47,6 +47,8 @@ class AudioLoader extends Loader {
 		const scope = this;
 
 		const loader = new FileLoader( this.manager );
+		loader.setPriority( this.priority );
+		loader.setCache( this.cache );
 		loader.setResponseType( 'arraybuffer' );
 		loader.setPath( this.path );
 		loader.setRequestHeader( this.requestHeader );
@@ -60,11 +62,21 @@ class AudioLoader extends Loader {
 				const bufferCopy = buffer.slice( 0 );
 
 				const context = AudioContext.getContext();
+
+				const decodeUrl = url + '#decode';
+				scope.manager.itemStart( decodeUrl ); // prevent loading manager from completing too early, see #33378
+
 				context.decodeAudioData( bufferCopy, function ( audioBuffer ) {
 
 					onLoad( audioBuffer );
+					scope.manager.itemEnd( decodeUrl );
 
-				} ).catch( handleError );
+				} ).catch( function ( e ) {
+
+					handleError( e );
+					scope.manager.itemEnd( decodeUrl );
+
+				} );
 
 			} catch ( e ) {
 

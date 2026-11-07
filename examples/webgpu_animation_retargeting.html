@@ -3,6 +3,10 @@
 		<title>three.js webgpu - animation retargeting</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<meta property="og:title" content="three.js webgpu - animation retargeting">
+		<meta property="og:type" content="website">
+		<meta property="og:url" content="https://threejs.org/examples/webgpu_animation_retargeting.html">
+		<meta property="og:image" content="https://threejs.org/examples/screenshots/webgpu_animation_retargeting.jpg">
 		<link type="text/css" rel="stylesheet" href="example.css">
 	</head>
 	<body>
@@ -62,7 +66,7 @@
 			const timer = new THREE.Timer();
 			timer.connect( document );
 
-			export const lightSpeed = /*#__PURE__*/ Fn( ( [ suv_immutable ] ) => {
+			export const lightSpeed = /*#__PURE__*/ Fn( ( [ suv_immutable, time ] ) => {
 
 				// forked from https://www.shadertoy.com/view/7ly3D1
 
@@ -73,13 +77,7 @@
 
 				return rays;
 
-			} ).setLayout( {
-				name: 'lightSpeed',
-				type: 'vec3',
-				inputs: [
-					{ name: 'suv', type: 'vec2' }
-				]
-			} );
+			}, { suv: 'vec2', time: 'float', return: 'vec3' } );
 
 			// scene
 
@@ -88,7 +86,7 @@
 			// background
 
 			const coloredVignette = screenUV.distance( .5 ).mix( hue( color( 0x0175ad ), time.mul( .1 ) ), hue( color( 0x02274f ), time.mul( .5 ) ) );
-			const lightSpeedEffect = lightSpeed( normalWorldGeometry ).clamp();
+			const lightSpeedEffect = lightSpeed( normalWorldGeometry, time ).clamp();
 			const lightSpeedSky = normalWorldGeometry.y.remapClamp( - .1, 1 ).mix( 0, lightSpeedEffect );
 			const composedBackground = blendDodge( coloredVignette, lightSpeedSky );
 

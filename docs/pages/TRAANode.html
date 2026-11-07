@@ -9,7 +9,7 @@
 	<link type="text/css" rel="stylesheet" href="../styles/page.css">
 </head>
 <body>
-		<p class="inheritance" translate="no"><a href="EventDispatcher.html">EventDispatcher</a> → <a href="Node.html">Node</a> → <a href="TempNode.html">TempNode</a> → </p>
+		<p class="inheritance" translate="no"><a href="EventDispatcher.html">EventDispatcher</a> → <a href="Node.html">Node</a> → </p>
 	<h1 translate="no">TRAANode</h1>
 		<section>
 			<header>
@@ -18,11 +18,12 @@
 <ul>
 <li><a href="https://alextardif.com/TAA.html" target="_blank" rel="noopener">https://alextardif.com/TAA.html</a></li>
 <li><a href="https://www.elopezr.com/temporal-aa-and-the-quest-for-the-holy-trail/" target="_blank" rel="noopener">https://www.elopezr.com/temporal-aa-and-the-quest-for-the-holy-trail/</a></li>
-</ul></div>
+</ul>
+<p>Note: MSAA must be disabled when TRAA is in use.</p></div>
 			</header>
 			<article>
 				<h2 class="subsection-title">Import</h2>
-				<p><span translate="no">TRAANode</span> is an addon, and must be imported explicitly, see <a href="https://threejs.org/manual/#en/installation" target="_blank" rel="noopener">Installation#Addons</a>.</p>
+				<p><span translate="no">TRAANode</span> is an addon, and must be imported explicitly, see <a href="https://threejs.org/manual/#installation#addons" target="_blank" rel="noopener">Installation#Addons</a>.</p>
 				<pre><code class="language-js">import { traa } from 'three/addons/tsl/display/TRAANode.js';</code></pre>
 				<div class="container-overview">
 					<h2>Constructor</h2>
@@ -35,7 +36,7 @@
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>beautyNode</strong>
+										<strong translate="no">beautyNode</strong>
 									</td>
 									<td class="description last">
 										<p>The texture node that represents the input of the effect.</p>
@@ -43,7 +44,7 @@
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>depthNode</strong>
+										<strong translate="no">depthNode</strong>
 									</td>
 									<td class="description last">
 										<p>A node that represents the scene's depth.</p>
@@ -51,7 +52,7 @@
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>velocityNode</strong>
+										<strong translate="no">velocityNode</strong>
 									</td>
 									<td class="description last">
 										<p>A node that represents the scene's velocity.</p>
@@ -59,7 +60,7 @@
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>camera</strong>
+										<strong translate="no">camera</strong>
 									</td>
 									<td class="description last">
 										<p>The camera the scene is rendered with.</p>
@@ -125,7 +126,7 @@ its effect once per frame in <code>updateBefore()</code>.</p>
 						<p>Default is <code>'frame'</code>.</p>
 					</div>
 						<dl class="details">
-							<dt class="tag-overrides"><strong>Overrides:</strong> <a href="TempNode.html#updateBeforeType">TempNode#updateBeforeType</a></dt>
+							<dt class="tag-overrides"><strong>Overrides:</strong> <a href="Node.html#updateBeforeType">Node#updateBeforeType</a></dt>
 						</dl>
 				</div>
 				<div class="member">
@@ -156,7 +157,7 @@ This reduces blurriness under motion, but can introduce a square pattern artifac
 when the effect is no longer required.</p>
 						</div>
 						<dl class="details">
-							<dt class="tag-overrides"><strong>Overrides:</strong> <a href="TempNode.html#dispose">TempNode#dispose</a></dt>
+							<dt class="tag-overrides"><strong>Overrides:</strong> <a href="Node.html#dispose">Node#dispose</a></dt>
 						</dl>
 					</div>
 					<h3 class="name name-method" id="getTextureNode" translate="no">.<a href="#getTextureNode">getTextureNode</a><span class="signature">()</span><span class="type-signature"> : <a href="PassTextureNode.html">PassTextureNode</a></span> </h3>
@@ -177,7 +178,7 @@ when the effect is no longer required.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>width</strong>
+										<strong translate="no">width</strong>
 									</td>
 									<td class="description last">
 										<p>The width of the effect.</p>
@@ -185,7 +186,7 @@ when the effect is no longer required.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>height</strong>
+										<strong translate="no">height</strong>
 									</td>
 									<td class="description last">
 										<p>The height of the effect.</p>
@@ -204,7 +205,7 @@ to the scene's camera.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>width</strong>
+										<strong translate="no">width</strong>
 									</td>
 									<td class="description last">
 										<p>The width of the effect.</p>
@@ -212,7 +213,7 @@ to the scene's camera.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>height</strong>
+										<strong translate="no">height</strong>
 									</td>
 									<td class="description last">
 										<p>The height of the effect.</p>
@@ -230,7 +231,7 @@ to the scene's camera.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>The current node builder.</p>
@@ -239,7 +240,7 @@ to the scene's camera.</p>
 							</tbody>
 						</table>
 						<dl class="details">
-							<dt class="tag-overrides"><strong>Overrides:</strong> <a href="TempNode.html#setup">TempNode#setup</a></dt>
+							<dt class="tag-overrides"><strong>Overrides:</strong> <a href="Node.html#setup">Node#setup</a></dt>
 						</dl>
 					</div>
 					<h3 class="name name-method" id="updateBefore" translate="no">.<a href="#updateBefore">updateBefore</a><span class="signature">( frame : <span class="param-type"><a href="NodeFrame.html">NodeFrame</a></span> )</span> </h3>
@@ -251,7 +252,7 @@ to the scene's camera.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>frame</strong>
+										<strong translate="no">frame</strong>
 									</td>
 									<td class="description last">
 										<p>The current node frame.</p>
@@ -260,7 +261,7 @@ to the scene's camera.</p>
 							</tbody>
 						</table>
 						<dl class="details">
-							<dt class="tag-overrides"><strong>Overrides:</strong> <a href="TempNode.html#updateBefore">TempNode#updateBefore</a></dt>
+							<dt class="tag-overrides"><strong>Overrides:</strong> <a href="Node.html#updateBefore">Node#updateBefore</a></dt>
 						</dl>
 					</div>
 				<h2 class="subsection-title">Source</h2>

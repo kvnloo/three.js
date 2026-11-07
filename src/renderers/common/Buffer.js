@@ -94,7 +94,7 @@ class Buffer extends Binding {
 	 */
 	get byteLength() {
 
-		return getFloatLength( this._buffer.byteLength );
+		return getFloatLength( this.buffer.byteLength );
 
 	}
 
@@ -119,6 +119,15 @@ class Buffer extends Binding {
 	update() {
 
 		return true;
+
+	}
+
+	/**
+	 * Releases the buffer.
+	 */
+	release() {
+
+		this._buffer = null;
 
 	}
 

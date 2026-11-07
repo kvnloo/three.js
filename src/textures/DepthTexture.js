@@ -1,4 +1,4 @@
-import { Source } from './Source.js';
+import { TextureSource } from './TextureSource.js';
 import { Texture } from './Texture.js';
 import { NearestFilter, UnsignedIntType, DepthFormat, DepthStencilFormat } from '../constants.js';
 
@@ -19,8 +19,8 @@ class DepthTexture extends Texture {
 	 * @param {number} [mapping=Texture.DEFAULT_MAPPING] - The texture mapping.
 	 * @param {number} [wrapS=ClampToEdgeWrapping] - The wrapS value.
 	 * @param {number} [wrapT=ClampToEdgeWrapping] - The wrapT value.
-	 * @param {number} [magFilter=LinearFilter] - The mag filter value.
-	 * @param {number} [minFilter=LinearFilter] - The min filter value.
+	 * @param {number} [magFilter=NearestFilter] - The mag filter value.
+	 * @param {number} [minFilter=NearestFilter] - The min filter value.
 	 * @param {number} [anisotropy=Texture.DEFAULT_ANISOTROPY] - The anisotropy value.
 	 * @param {number} [format=DepthFormat] - The texture format.
 	 * @param {number} [depth=1] - The depth of the texture.
@@ -29,7 +29,7 @@ class DepthTexture extends Texture {
 
 		if ( format !== DepthFormat && format !== DepthStencilFormat ) {
 
-			throw new Error( 'DepthTexture format must be either THREE.DepthFormat or THREE.DepthStencilFormat' );
+			throw new Error( 'THREE.DepthTexture: format must be either THREE.DepthFormat or THREE.DepthStencilFormat' );
 
 		}
 
@@ -82,7 +82,7 @@ class DepthTexture extends Texture {
 
 		super.copy( source );
 
-		this.source = new Source( Object.assign( {}, source.image ) ); // see #30540
+		this.source = new TextureSource( Object.assign( {}, source.image ) ); // see #30540
 		this.compareFunction = source.compareFunction;
 
 		return this;
@@ -93,7 +93,7 @@ class DepthTexture extends Texture {
 
 		const data = super.toJSON( meta );
 
-		if ( this.compareFunction !== null ) data.compareFunction = this.compareFunction;
+		data.compareFunction = this.compareFunction;
 
 		return data;
 

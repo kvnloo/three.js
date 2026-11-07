@@ -49,6 +49,19 @@ class MeshPhongNodeMaterial extends NodeMaterial {
 		this.lights = true;
 
 		/**
+		 * The emissive color of phong materials is by default inferred from the `emissive`,
+		 * `emissiveIntensity` and `emissiveMap` properties. This node property allows to
+		 * overwrite the default and define the emissive color with a node instead.
+		 *
+		 * If you don't want to overwrite the emissive color but modify the existing
+		 * value instead, use {@link materialEmissive}.
+		 *
+		 * @type {?Node<vec3>}
+		 * @default null
+		 */
+		this.emissiveNode = null;
+
+		/**
 		 * The shininess of phong materials is by default inferred from the `shininess`
 		 * property. This node property allows to overwrite the default
 		 * and define the shininess with a node instead.
@@ -124,15 +137,6 @@ class MeshPhongNodeMaterial extends NodeMaterial {
 		const specularNode = this.specularNode || materialSpecular;
 
 		specularColor.assign( specularNode );
-
-	}
-
-	copy( source ) {
-
-		this.shininessNode = source.shininessNode;
-		this.specularNode = source.specularNode;
-
-		return super.copy( source );
 
 	}
 

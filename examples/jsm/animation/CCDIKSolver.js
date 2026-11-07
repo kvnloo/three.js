@@ -4,6 +4,7 @@ import {
 	Color,
 	Line,
 	LineBasicMaterial,
+	MathUtils,
 	Matrix4,
 	Mesh,
 	MeshBasicMaterial,
@@ -23,6 +24,7 @@ const _invLinkQ = new Quaternion();
 const _linkScale = new Vector3();
 const _axis = new Vector3();
 const _vector = new Vector3();
+const _center = new Vector3();
 const _matrix = new Matrix4();
 
 /**
@@ -204,7 +206,11 @@ class CCDIKSolver {
 
 					if ( c > 1.0 ) c = 1.0;
 
-					const c2 = math.sqrt( 1 - c * c );
+					// preserve sign of the rotation along the limitation axis,
+					// otherwise negative rotations get mirrored to positive
+					const dot = link.quaternion.x * limitation.x + link.quaternion.y * limitation.y + link.quaternion.z * limitation.z;
+					const sign = dot < 0 ? - 1 : 1;
+					const c2 = sign * math.sqrt( 1 - c * c );
 					link.quaternion.set( limitation.x * c2,
 					                     limitation.y * c2,
 					                     limitation.z * c2,
@@ -212,15 +218,25 @@ class CCDIKSolver {
 
 				}
 
-				if ( rotationMin !== undefined ) {
+				if ( rotationMin !== undefined || rotationMax !== undefined ) {
 
-					link.rotation.setFromVector3( _vector.setFromEuler( link.rotation ).max( rotationMin ) );
+					_vector.setFromEuler( link.rotation );
 
-				}
+					if ( rotationMin !== undefined && rotationMax !== undefined ) {
 
-				if ( rotationMax !== undefined ) {
+						// wrap angles to within ±π of the limits' center so ranges crossing ±π clamp correctly
+						_center.addVectors( rotationMin, rotationMax ).multiplyScalar( 0.5 );
 
-					link.rotation.setFromVector3( _vector.setFromEuler( link.rotation ).min( rotationMax ) );
+						_vector.x = _center.x + MathUtils.euclideanModulo( _vector.x - _center.x + Math.PI, 2 * Math.PI ) - Math.PI;
+						_vector.y = _center.y + MathUtils.euclideanModulo( _vector.y - _center.y + Math.PI, 2 * Math.PI ) - Math.PI;
+						_vector.z = _center.z + MathUtils.euclideanModulo( _vector.z - _center.z + Math.PI, 2 * Math.PI ) - Math.PI;
+
+					}
+
+					if ( rotationMin !== undefined ) _vector.max( rotationMin );
+					if ( rotationMax !== undefined ) _vector.min( rotationMax );
+
+					link.rotation.setFromVector3( _vector );
 
 				}
 

@@ -69,6 +69,10 @@ export class LUTCubeLoader extends Loader {
 	load( url, onLoad, onProgress, onError ) {
 
 		const loader = new FileLoader( this.manager );
+		loader.setPriority( this.priority );
+		loader.setCache( this.cache );
+		loader.setRequestHeader( this.requestHeader );
+		loader.setWithCredentials( this.withCredentials );
 		loader.setPath( this.path );
 		loader.setResponseType( 'text' );
 		loader.load( url, text => {
@@ -107,8 +111,8 @@ export class LUTCubeLoader extends Loader {
 
 		const regExpTitle = /TITLE +"([^"]*)"/;
 		const regExpSize = /LUT_3D_SIZE +(\d+)/;
-		const regExpDomainMin = /DOMAIN_MIN +([\d.]+) +([\d.]+) +([\d.]+)/;
-		const regExpDomainMax = /DOMAIN_MAX +([\d.]+) +([\d.]+) +([\d.]+)/;
+		const regExpDomainMin = /DOMAIN_MIN +([\d.e+-]+) +([\d.e+-]+) +([\d.e+-]+)/;
+		const regExpDomainMax = /DOMAIN_MAX +([\d.e+-]+) +([\d.e+-]+) +([\d.e+-]+)/;
 		const regExpDataPoints = /^([\d.e+-]+) +([\d.e+-]+) +([\d.e+-]+) *$/gm;
 
 		let result = regExpTitle.exec( input );
@@ -118,7 +122,7 @@ export class LUTCubeLoader extends Loader {
 
 		if ( result === null ) {
 
-			throw new Error( 'LUTCubeLoader: Missing LUT_3D_SIZE information' );
+			throw new Error( 'THREE.LUTCubeLoader: Missing LUT_3D_SIZE information' );
 
 		}
 
@@ -147,7 +151,7 @@ export class LUTCubeLoader extends Loader {
 
 		if ( domainMin.x > domainMax.x || domainMin.y > domainMax.y || domainMin.z > domainMax.z ) {
 
-			throw new Error( 'LUTCubeLoader: Invalid input domain' );
+			throw new Error( 'THREE.LUTCubeLoader: Invalid input domain' );
 
 		}
 

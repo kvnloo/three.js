@@ -71,7 +71,7 @@ class BufferAttributeNode extends InputNode {
 	/**
 	 * Constructs a new buffer attribute node.
 	 *
-	 * @param {BufferAttribute|InterleavedBuffer|TypedArray} value - The attribute data.
+	 * @param {BufferAttribute|InterleavedBufferAttribute|InterleavedBuffer|TypedArray} value - The attribute data.
 	 * @param {?string} [bufferType=null] - The buffer type (e.g. `'vec3'`).
 	 * @param {number} [bufferStride=0] - The buffer stride.
 	 * @param {number} [bufferOffset=0] - The buffer offset.
@@ -152,6 +152,13 @@ class BufferAttributeNode extends InputNode {
 			this.usage = value.usage;
 			this.instanced = value.isInstancedBufferAttribute;
 
+		} else if ( value && value.isInterleavedBufferAttribute === true ) {
+
+			// e.g. a column of a buffer attribute with an item size larger than four
+
+			this.attribute = value;
+			this.usage = value.data.usage;
+
 		}
 
 	}
@@ -164,6 +171,8 @@ class BufferAttributeNode extends InputNode {
 	 * @return {string} The hash.
 	 */
 	getHash( builder ) {
+
+		let id;
 
 		if ( this.bufferStride === 0 && this.bufferOffset === 0 ) {
 
@@ -179,11 +188,15 @@ class BufferAttributeNode extends InputNode {
 
 			}
 
-			return bufferData.node.uuid;
+			id = bufferData.node.id;
+
+		} else {
+
+			id = this.id;
 
 		}
 
-		return this.uuid;
+		return String( id );
 
 	}
 
@@ -194,7 +207,7 @@ class BufferAttributeNode extends InputNode {
 	 * @param {NodeBuilder} builder - The current node builder.
 	 * @return {string} The node type.
 	 */
-	getNodeType( builder ) {
+	generateNodeType( builder ) {
 
 		if ( this.bufferType === null ) {
 
@@ -259,8 +272,11 @@ class BufferAttributeNode extends InputNode {
 	generate( builder ) {
 
 		const nodeType = this.getNodeType( builder );
+		const nodeName = builder.context.nodeName;
 
-		const nodeAttribute = builder.getBufferAttributeFromNode( this, nodeType );
+		if ( nodeName !== undefined ) delete builder.context.nodeName; // deleting when consumed
+
+		const nodeAttribute = builder.getBufferAttributeFromNode( this, nodeType, nodeName );
 		const propertyName = builder.getPropertyName( nodeAttribute );
 
 		let output = null;
@@ -273,7 +289,15 @@ class BufferAttributeNode extends InputNode {
 
 		} else {
 
-			const nodeVarying = varying( this );
+			let varyingName;
+
+			if ( nodeName ) {
+
+				varyingName = nodeName + 'Varying';
+
+			}
+
+			const nodeVarying = varying( this, varyingName );
 
 			output = nodeVarying.build( builder, nodeType );
 
@@ -326,6 +350,19 @@ class BufferAttributeNode extends InputNode {
 		this.instanced = value;
 
 		return this;
+
+	}
+
+	/**
+	 * Returns the buffer attribute to bind when rendering the given object. Nodes that
+	 * bind attributes of the rendered object, like {@link ReferenceAttributeNode}, overwrite it.
+	 *
+	 * @param {Object3D} object - The rendered object.
+	 * @return {?(BufferAttribute|InterleavedBufferAttribute)} The buffer attribute.
+	 */
+	getObjectAttribute( /*object*/ ) {
+
+		return this.attribute;
 
 	}
 
@@ -423,4 +460,4 @@ export const instancedBufferAttribute = ( array, type = null, stride = 0, offset
  */
 export const instancedDynamicBufferAttribute = ( array, type = null, stride = 0, offset = 0 ) => createBufferAttribute( array, type, stride, offset, DynamicDrawUsage, true );
 
-addMethodChaining( 'toAttribute', ( bufferNode ) => bufferAttribute( bufferNode.value ) );
+addMethodChaining( 'toAttribute', ( bufferNode ) => bufferAttribute( bufferNode.value, bufferNode.bufferType ) );

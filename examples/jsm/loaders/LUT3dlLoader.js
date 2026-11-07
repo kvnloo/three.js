@@ -70,6 +70,10 @@ export class LUT3dlLoader extends Loader {
 	load( url, onLoad, onProgress, onError ) {
 
 		const loader = new FileLoader( this.manager );
+		loader.setPriority( this.priority );
+		loader.setCache( this.cache );
+		loader.setRequestHeader( this.requestHeader );
+		loader.setWithCredentials( this.withCredentials );
 		loader.setPath( this.path );
 		loader.setResponseType( 'text' );
 		loader.load( url, text => {
@@ -114,7 +118,7 @@ export class LUT3dlLoader extends Loader {
 
 		if ( result === null ) {
 
-			throw new Error( 'LUT3dlLoader: Missing grid information' );
+			throw new Error( 'THREE.LUT3dlLoader: Missing grid information' );
 
 		}
 
@@ -127,7 +131,7 @@ export class LUT3dlLoader extends Loader {
 
 			if ( gridStep !== ( gridLines[ i ] - gridLines[ i - 1 ] ) ) {
 
-				throw new Error( 'LUT3dlLoader: Inconsistent grid size' );
+				throw new Error( 'THREE.LUT3dlLoader: Inconsistent grid size' );
 
 			}
 
@@ -160,7 +164,7 @@ export class LUT3dlLoader extends Loader {
 		}
 
 		// Determine the bit depth to scale the values to [0.0, 1.0].
-		const bits = Math.ceil( Math.log2( maxValue ) );
+		const bits = Math.max( 0, Math.ceil( Math.log2( maxValue ) ) );
 		const maxBitValue = Math.pow( 2, bits );
 
 		const data = this.type === UnsignedByteType ? new Uint8Array( dataFloat.length ) : dataFloat;
