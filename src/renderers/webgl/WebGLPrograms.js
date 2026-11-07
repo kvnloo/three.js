@@ -51,7 +51,24 @@ function WebGLPrograms( renderer, environments, extensions, capabilities, bindin
 
 	}
 
-	function getParameters( material, lights, shadows, scene, object, lightProbeGrids ) {
+	function getRenderTargetSignature( renderTarget ) {
+
+	if ( renderTarget === null ) return '';
+
+	const signature = [];
+
+	for ( let i = 0, l = renderTarget.textures.length; i < l; i ++ ) {
+
+		const texture = renderTarget.textures[ i ];
+		signature.push( texture.uuid, texture.name, texture.type );
+
+	}
+
+	return JSON.stringify( signature );
+
+}
+
+function getParameters( material, lights, shadows, scene, object, lightProbeGrids ) {
 
 		const fog = scene.fog;
 		const geometry = object.geometry;
@@ -214,6 +231,7 @@ function WebGLPrograms( renderer, environments, extensions, capabilities, bindin
 			instancingColor: IS_INSTANCEDMESH && object.instanceColor !== null,
 			instancingMorph: IS_INSTANCEDMESH && object.morphTexture !== null,
 
+			renderTarget: currentRenderTarget,
 			outputColorSpace: ( currentRenderTarget === null ) ? renderer.outputColorSpace : ( currentRenderTarget.isXRRenderTarget === true ? currentRenderTarget.texture.colorSpace : ColorManagement.workingColorSpace ),
 			alphaToCoverage: !! material.alphaToCoverage,
 
@@ -439,6 +457,9 @@ function WebGLPrograms( renderer, environments, extensions, capabilities, bindin
 			getProgramCacheKeyParameters( array, parameters );
 			getProgramCacheKeyBooleans( array, parameters );
 			array.push( renderer.outputColorSpace );
+
+			// Include in-place name and type changes as well as texture replacements.
+			array.push( getRenderTargetSignature( parameters.renderTarget ) );
 
 		}
 
@@ -694,6 +715,7 @@ function WebGLPrograms( renderer, environments, extensions, capabilities, bindin
 	return {
 		getParameters: getParameters,
 		getProgramCacheKey: getProgramCacheKey,
+		getRenderTargetSignature: getRenderTargetSignature,
 		getUniforms: getUniforms,
 		acquireProgram: acquireProgram,
 		releaseProgram: releaseProgram,

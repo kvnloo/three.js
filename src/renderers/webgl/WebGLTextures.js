@@ -525,7 +525,8 @@ function WebGLTextures( _gl, extensions, state, properties, capabilities, utils,
 
 		}
 
-		const textures = renderTarget.textures;
+		// The array may have been mutated before dispose; free the textures actually allocated.
+		const textures = renderTargetProperties.__colorAttachments || renderTarget.textures;
 
 		for ( let i = 0, il = textures.length; i < il; i ++ ) {
 
@@ -2062,6 +2063,42 @@ function WebGLTextures( _gl, extensions, state, properties, capabilities, utils,
 
 	}
 
+	// Rebuild only when the objects in the attachment array change. Renames do not
+	// require GPU reallocation, but a replaced texture must be bound to the FBO.
+	function updateRenderTargetAttachments( renderTarget ) {
+
+		const previous = properties.get( renderTarget ).__colorAttachments;
+		const current = renderTarget.textures;
+
+		if ( previous === undefined ) return false;
+
+		if ( previous.length === current.length ) {
+
+			let unchanged = true;
+
+			for ( let i = 0; i < current.length; i ++ ) {
+
+				if ( previous[ i ] !== current[ i ] ) {
+
+					unchanged = false;
+					break;
+
+				}
+
+			}
+
+			if ( unchanged ) return false;
+
+		}
+
+		// Recreate GPU resources without dispatching a public dispose event.
+		destroyRenderTarget( renderTarget );
+		setupRenderTarget( renderTarget );
+
+		return true;
+
+	}
+
 	// Set up GL resources for the render target
 	function setupRenderTarget( renderTarget ) {
 
@@ -2074,6 +2111,7 @@ function WebGLTextures( _gl, extensions, state, properties, capabilities, utils,
 		track( renderTarget );
 
 		const textures = renderTarget.textures;
+		renderTargetProperties.__colorAttachments = textures.slice();
 
 		const isCube = ( renderTarget.isWebGLCubeRenderTarget === true );
 		const isMultipleRenderTargets = ( textures.length > 1 );
@@ -2559,6 +2597,7 @@ function WebGLTextures( _gl, extensions, state, properties, capabilities, utils,
 	this.setTextureCube = setTextureCube;
 	this.rebindTextures = rebindTextures;
 	this.setupRenderTarget = setupRenderTarget;
+	this.updateRenderTargetAttachments = updateRenderTargetAttachments;
 	this.updateRenderTargetMipmap = updateRenderTargetMipmap;
 	this.updateMultisampleRenderTarget = updateMultisampleRenderTarget;
 	this.setupDepthRenderbuffer = setupDepthRenderbuffer;
