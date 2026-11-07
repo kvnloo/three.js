@@ -245,6 +245,9 @@ import './src/renderers/shaders/UniformsUtils.tests.js';
 import './src/renderers/webgl/WebGLExtensions.tests.js';
 import './src/renderers/webgl/WebGLRenderLists.tests.js';
 
+//src/renderers/webgpu
+import './src/renderers/webgpu/WebGPUTextureUtils.tests.js';
+
 
 //src/scenes
 import './src/scenes/Fog.tests.js';
