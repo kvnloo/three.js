@@ -280,6 +280,7 @@ import './src/nodes/tsl/GPUTest.tests.js';
 import './src/nodes/tsl/TSLConditionalSelect.tests.js';
 import './src/nodes/tsl/GPUAtomicsStorage.tests.js';
 import './src/nodes/tsl/GPUComputeBuiltins.tests.js';
+import './src/nodes/tsl/GPUInvocationIndex.tests.js';
 import './src/nodes/tsl/GPUBarriers.tests.js';
 import './src/nodes/tsl/GPUSubgroup.tests.js';
 import './src/nodes/tsl/GPUWorkgroupAtomic.tests.js';

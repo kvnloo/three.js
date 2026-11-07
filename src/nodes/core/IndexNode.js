@@ -8,6 +8,7 @@ import { varying } from './VaryingNode.js';
  *
  * - `vertexIndex`: The index of a vertex within a mesh.
  * - `instanceIndex`: The index of either a mesh instance or an invocation of a compute shader.
+ * - `invocationIndex`: The flattened global index of a compute shader invocation.
  * - `drawIndex`: The index of a draw call.
  * - `invocationLocalIndex`: The index of a compute invocation within the scope of a workgroup.
  * - `invocationSubgroupIndex`: The index of a compute invocation within the scope of a subgroup.
@@ -26,7 +27,7 @@ class IndexNode extends Node {
 	/**
 	 * Constructs a new index node.
 	 *
-	 * @param {('vertex'|'instance'|'subgroup'|'invocationLocal'|'invocationSubgroup'|'draw')} scope - The scope of the index node.
+	 * @param {('vertex'|'instance'|'invocationGlobal'|'subgroup'|'invocationLocal'|'invocationSubgroup'|'draw')} scope - The scope of the index node.
 	 */
 	constructor( scope ) {
 
@@ -70,6 +71,10 @@ class IndexNode extends Node {
 		} else if ( scope === IndexNode.INSTANCE ) {
 
 			propertyName = builder.getInstanceIndex();
+
+		} else if ( scope === IndexNode.INVOCATION_GLOBAL ) {
+
+			propertyName = builder.getInvocationIndex();
 
 		} else if ( scope === IndexNode.DRAW ) {
 
@@ -115,6 +120,7 @@ class IndexNode extends Node {
 
 IndexNode.VERTEX = 'vertex';
 IndexNode.INSTANCE = 'instance';
+IndexNode.INVOCATION_GLOBAL = 'invocationGlobal';
 IndexNode.SUBGROUP = 'subgroup';
 IndexNode.INVOCATION_LOCAL = 'invocationLocal';
 IndexNode.INVOCATION_SUBGROUP = 'invocationSubgroup';
@@ -131,6 +137,15 @@ export default IndexNode;
 export const vertexIndex = /*@__PURE__*/ nodeImmutable( IndexNode, IndexNode.VERTEX );
 
 /**
+ * TSL object representing the flattened global invocation index in a compute shader.
+ * The index spans every workgroup, with X changing fastest, then Y, then Z.
+ *
+ * @tsl
+ * @type {IndexNode}
+ */
+export const invocationIndex = /*@__PURE__*/ nodeImmutable( IndexNode, IndexNode.INVOCATION_GLOBAL );
+
+/**
  * TSL object that contextually represents specific index data depending on the shader stage.
  *
  * Within the vertex and fragment stages, `instanceIndex` will represent the index of the current mesh instance being evaluated by the shader.
@@ -144,6 +159,7 @@ export const vertexIndex = /*@__PURE__*/ nodeImmutable( IndexNode, IndexNode.VER
  * ```
  *
  * Within the compute stage, `instanceIndex` will represent the global index of a compute invocation within the 3-dimensional compute workgroup load.
+ * It remains supported for compatibility; `invocationIndex` names this compute-only index explicitly.
  * In this stage, use `instanceIndex` to modify or select data at a given index within a buffer, or derive values from the index itself.
  *
  * ```js

@@ -1606,6 +1606,18 @@ ${ flowData.code }
 	 *
 	 * @return {string} The instance index.
 	 */
+	getInvocationIndex() {
+
+		if ( this.shaderStage === 'compute' ) {
+
+			return 'invocationIndex';
+
+		}
+
+		throw new Error( 'getInvocationIndex() is only valid in compute shaders.' );
+
+	}
+
 	getInstanceIndex() {
 
 		if ( this.shaderStage === 'vertex' ) {
@@ -2771,6 +2783,7 @@ fn main( ${shaderData.varyings} ) -> ${shaderData.returnType} {
 ${ shaderData.directives }
 
 // system
+var<private> invocationIndex : u32;
 var<private> instanceIndex : u32;
 
 // locals
@@ -2795,9 +2808,10 @@ fn main( ${ shaderData.attributes } ) {
 	${ this.allowGlobalVariables ? '' : shaderData.vars }
 
 	// system
-	instanceIndex = globalId.x
+	invocationIndex = globalId.x
 		+ globalId.y * ( ${ workgroupSizeX } * numWorkgroups.x )
 		+ globalId.z * ( ${ workgroupSizeX } * numWorkgroups.x ) * ( ${ workgroupSizeY } * numWorkgroups.y );
+	instanceIndex = invocationIndex;
 
 	// flow
 	${ shaderData.flow }

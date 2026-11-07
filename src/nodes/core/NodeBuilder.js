@@ -1220,6 +1220,18 @@ class NodeBuilder {
 	}
 
 	/**
+	 * Returns the flattened global index of a compute shader invocation.
+	 *
+	 * @abstract
+	 * @return {string} The global invocation index shader string.
+	 */
+	getInvocationIndex() {
+
+		warn( 'Abstract function.' );
+
+	}
+
+	/**
 	 * Contextually returns either the vertex stage instance index builtin
 	 * or the linearized index of an compute invocation within a grid of workgroups.
 	 *
