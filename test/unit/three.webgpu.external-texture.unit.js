@@ -113,8 +113,10 @@ export default QUnit.module( 'WebGPU', () => {
 			assert.deepEqual( await readPixel( device, secondSource ), [ 0, 255, 0, 255 ], 'rebound resolve is green' );
 			assert.strictEqual( await device.popErrorScope(), null, 'rebound MSAA pass validates on the GPU' );
 
+			// Creating a view of a destroyed texture is valid; using it in a pass is not.
+			// The attempted blue resolve must fail and leave the caller-owned firstSource red.
 			device.pushErrorScope( 'validation' );
-			oldMSAA.createView();
+			clearMSAA( device, oldMSAA, firstSource, { r: 0, g: 0, b: 1, a: 1 } );
 			assert.ok( await device.popErrorScope(), 'old three-owned MSAA allocation is destroyed' );
 
 			backend.textureUtils.destroyTexture( texture );
