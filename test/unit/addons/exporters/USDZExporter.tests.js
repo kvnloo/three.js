@@ -1,4 +1,4 @@
-import { BoxGeometry, Mesh, MeshStandardMaterial, Scene, SphereGeometry } from 'three';
+import { BoxGeometry, Color, Mesh, MeshStandardMaterial, Scene, SphereGeometry } from 'three';
 import { USDZExporter } from '../../../../examples/jsm/exporters/USDZExporter.js';
 import { USDLoader } from '../../../../examples/jsm/loaders/USDLoader.js';
 import { unzipSync, strFromU8 } from '../../../../examples/jsm/libs/fflate.module.js';
@@ -9,6 +9,23 @@ function isValidUSDA( usda ) {
 	if ( header !== '#usda 1.0' ) return false;
 
 	return true;
+
+}
+
+async function exportedEmissiveColor( channels, intensity, quickLookCompatible ) {
+
+	const scene = new Scene();
+	const material = new MeshStandardMaterial( {
+		emissive: new Color( channels[ 0 ], channels[ 1 ], channels[ 2 ] ),
+		emissiveIntensity: intensity
+	} );
+	scene.add( new Mesh( new BoxGeometry( 1, 1, 1 ), material ) );
+
+	const result = await new USDZExporter().parseAsync( scene, { quickLookCompatible } );
+	const usda = strFromU8( unzipSync( result )[ 'model.usda' ] );
+	const match = usda.match( /color3f inputs:emissiveColor = \(([^)]+)\)/ );
+
+	return match === null ? null : match[ 1 ];
 
 }
 
@@ -34,6 +51,48 @@ export default QUnit.module( 'Addons', () => {
 					typeof exporter.setTextureUtils === 'function',
 					'setTextureUtils method exists'
 				);
+
+			} );
+
+			QUnit.test( 'untextured emissive intensity 5', async ( assert ) => {
+
+				for ( const quickLookCompatible of [ false, true ] ) {
+
+					assert.strictEqual(
+						await exportedEmissiveColor( [ 1, 0, 0 ], 5, quickLookCompatible ),
+						'5, 0, 0',
+						`Emissive color is multiplied by 5 (quickLookCompatible: ${quickLookCompatible})`
+					);
+
+				}
+
+			} );
+
+			QUnit.test( 'untextured fractional emissive intensity 2', async ( assert ) => {
+
+				for ( const quickLookCompatible of [ false, true ] ) {
+
+					assert.strictEqual(
+						await exportedEmissiveColor( [ 0.25, 0.5, 0.75 ], 2, quickLookCompatible ),
+						'0.5, 1, 1.5',
+						`HDR emissive channels are retained (quickLookCompatible: ${quickLookCompatible})`
+					);
+
+				}
+
+			} );
+
+			QUnit.test( 'untextured unity emissive intensity', async ( assert ) => {
+
+				for ( const quickLookCompatible of [ false, true ] ) {
+
+					assert.strictEqual(
+						await exportedEmissiveColor( [ 0.125, 0.25, 0.5 ], 1, quickLookCompatible ),
+						'0.125, 0.25, 0.5',
+						`Unity intensity is unchanged (quickLookCompatible: ${quickLookCompatible})`
+					);
+
+				}
 
 			} );
 
