@@ -11,7 +11,7 @@ import { BackSide, DepthFormat, DepthStencilFormat, RGBAFormat, UnsignedByteType
 import { DepthTexture } from '../../textures/DepthTexture.js';
 import { XRRenderTarget } from './XRRenderTarget.js';
 import { CylinderGeometry } from '../../geometries/CylinderGeometry.js';
-import { warn } from '../../utils.js';
+import { warn, warnOnce } from '../../utils.js';
 import { renderOutput } from '../../nodes/display/RenderOutputNode.js';
 import { RenderTarget } from '../../core/RenderTarget.js';
 import { Group } from '../../objects/Group.js';

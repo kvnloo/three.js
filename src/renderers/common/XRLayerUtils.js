@@ -57,8 +57,8 @@ const setUVMapping = ( eyeIndex, uvFactors, geometry ) => {
  */
 const positionQuad = ( plane, translation, quaternion ) => {
 
-	plane.position.copy( translation );
-	plane.quaternion.copy( quaternion );
+	plane.position.set( translation?.x ?? 0, translation?.y ?? 0, translation?.z ?? 0 );
+	plane.quaternion.set( quaternion?.x ?? 0, quaternion?.y ?? 0, quaternion?.z ?? 0, quaternion?.w ?? 1 );
 
 };
 
@@ -205,16 +205,20 @@ const toggleBlendLayerRender = ( layer, toggle ) => {
 
 	layer.group.children.forEach( mesh => {
 
-		if ( ! mesh.textureMaterial && toggle ) {
+		if ( toggle ) {
 
-			//store the original material with the texture map
-			mesh.textureMaterial = mesh.material;
-			//swap the material with a cmmmon blend layer material
+			if ( mesh.textureMaterial === undefined || mesh.textureMaterial === null ) {
+
+				// Save the original texture material on the first enable.
+				mesh.textureMaterial = mesh.material;
+
+			}
+
 			mesh.material = layer.blendMaterial;
 
-		} else {
+		} else if ( mesh.textureMaterial !== undefined && mesh.textureMaterial !== null ) {
 
-			//disable the blend layer material.
+			// Restore only after blend mode was enabled.
 			mesh.material = mesh.textureMaterial;
 			mesh.textureMaterial = null;
 
