@@ -141,7 +141,7 @@ class RenderTarget extends EventDispatcher {
 		 *
 		 * @type {Array<Texture>}
 		 */
-		this.textures = [];
+		this._textures = [];
 
 		const count = options.count;
 		for ( let i = 0; i < count; i ++ ) {
@@ -327,7 +327,63 @@ class RenderTarget extends EventDispatcher {
 
 	set texture( value ) {
 
+		const previous = this.textures[ 0 ];
+
+		if ( previous !== value && previous !== undefined && previous !== null && previous.renderTarget === this ) {
+
+			previous.isRenderTargetTexture = false;
+			previous.renderTarget = null;
+
+		}
+
+		if ( value !== null && value !== undefined ) {
+
+			value.isRenderTargetTexture = true;
+			value.renderTarget = this;
+
+		}
+
 		this.textures[ 0 ] = value;
+
+	}
+
+	/**
+	 * Color attachments for the render target.
+	 * Each newly assigned attachment is registered as a render-target texture.
+	 *
+	 * @type {Array<Texture>}
+	 */
+	get textures() {
+
+		return this._textures;
+
+	}
+
+	set textures( value ) {
+
+		for ( const previous of this._textures ) {
+
+			if ( previous !== null && ! value.includes( previous ) && previous.renderTarget === this ) {
+
+				previous.isRenderTargetTexture = false;
+				previous.renderTarget = null;
+
+			}
+
+		}
+
+		for ( const texture of value ) {
+
+			if ( texture !== null ) {
+
+				texture.isRenderTargetTexture = true;
+				texture.renderTarget = this;
+
+			}
+
+		}
+
+		this._textures = value;
 
 	}
 

@@ -304,25 +304,63 @@ class WebGPUTextureUtils {
 		const backend = this.backend;
 		const textureData = backend.get( texture );
 
-		if ( textureData.initialized ) {
+		// XR-provided external resources are managed by the XR backend.
+		if ( textureData.initialized && textureData.externalTexture === true ) return;
 
-			// Skip creation for external XR textures - they are already set up
-			if ( textureData.externalTexture === true ) {
+		if ( texture.isExternalTexture === true ) {
 
-				return;
+			const sourceTexture = texture.sourceTexture;
+
+			// A rebind replaces only three-owned MSAA storage; the old resolve texture
+			// and the new resolve texture remain owned by the caller.
+			if ( textureData.msaaTexture !== undefined ) {
+
+				textureData.msaaTexture.destroy();
+				delete textureData.msaaTexture;
 
 			}
 
-			throw new Error( 'THREE.WebGPUTextureUtils: Texture already initialized.' );
+			textureData.texture = sourceTexture;
+			textureData.format = sourceTexture?.format;
 
-		}
+			if ( sourceTexture !== null && sourceTexture !== undefined ) {
 
-		if ( texture.isExternalTexture ) {
+				const { samples, isMSAA } = backend.utils.getTextureSampleData( texture );
 
-			textureData.texture = texture.sourceTexture;
+				if ( isMSAA ) {
+
+					// A multisampled 2D texture cannot have multiple array layers.
+					if ( sourceTexture.depthOrArrayLayers > 1 ) {
+
+						throw new Error( 'THREE.WebGPUTextureUtils: External MSAA attachments require a single array layer.' );
+
+					}
+
+					const msaaTextureDescriptorGPU = new GPUTextureDescriptor();
+					msaaTextureDescriptorGPU.label = texture.name + '-msaa';
+					msaaTextureDescriptorGPU.size.width = sourceTexture.width;
+					msaaTextureDescriptorGPU.size.height = sourceTexture.height;
+					msaaTextureDescriptorGPU.size.depthOrArrayLayers = 1;
+					msaaTextureDescriptorGPU.sampleCount = samples;
+					msaaTextureDescriptorGPU.dimension = this._getDimension( texture );
+					msaaTextureDescriptorGPU.format = sourceTexture.format;
+					msaaTextureDescriptorGPU.usage = GPUTextureUsage.RENDER_ATTACHMENT;
+
+					textureData.msaaTexture = backend.device.createTexture( msaaTextureDescriptorGPU );
+
+				}
+
+			}
+
 			textureData.initialized = true;
 
 			return;
+
+		}
+
+		if ( textureData.initialized ) {
+
+			throw new Error( 'THREE.WebGPUTextureUtils: Texture already initialized.' );
 
 		}
 
