@@ -85,13 +85,13 @@ class ScopedArrayNode extends ScopedVariableNode {
 	 */
 	getInputType( /*builder*/ ) {
 
-		return `${this.scope.toUpperCase()}Array`;
+		return `${this.scope.charAt( 0 ).toUpperCase()}${this.scope.slice( 1 )}Array`;
 
 	}
 
 	getScopedName() {
 
-		return ( this.name !== '' ) ? this.name : `${this.scope}Array_${this.id}`;
+		return ( this.name !== '' ) ? this.name : `${this.scope.charAt( 0 ).toUpperCase()}${this.scope.slice( 1 )}Array_${this.id}`;
 
 	}
 

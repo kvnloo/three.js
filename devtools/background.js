@@ -1,4 +1,4 @@
-/* global chrome, importScripts, MESSAGE_ID, MESSAGE_INIT, MESSAGE_REQUEST_STATE, MESSAGE_REQUEST_OBJECT_DETAILS, MESSAGE_SCROLL_TO_CANVAS, MESSAGE_HIGHLIGHT_OBJECT, MESSAGE_UNHIGHLIGHT_OBJECT, EVENT_REGISTER, EVENT_COMMITTED */
+/* global chrome, importScripts, MESSAGE_INIT, MESSAGE_REQUEST_STATE, MESSAGE_REQUEST_OBJECT_DETAILS, MESSAGE_SCROLL_TO_CANVAS, MESSAGE_HIGHLIGHT_OBJECT, MESSAGE_UNHIGHLIGHT_OBJECT, MESSAGE_SELECT_OBJECTS, EVENT_REGISTER, EVENT_COMMITTED */
 
 importScripts( 'constants.js' );
 
@@ -11,7 +11,8 @@ const FORWARDABLE_MESSAGES = new Set( [
 	MESSAGE_REQUEST_OBJECT_DETAILS,
 	MESSAGE_SCROLL_TO_CANVAS,
 	MESSAGE_HIGHLIGHT_OBJECT,
-	MESSAGE_UNHIGHLIGHT_OBJECT
+	MESSAGE_UNHIGHLIGHT_OBJECT,
+	MESSAGE_SELECT_OBJECTS
 ] );
 
 // Badge helpers. The tab may already be gone, so errors are ignored.
@@ -26,6 +27,24 @@ function setBadge( tabId, text, color ) {
 function clearBadge( tabId ) {
 
 	chrome.action.setBadgeText( { tabId: tabId, text: '' } ).catch( () => {} );
+
+}
+
+// The panel inspecting a tab, if one is open. A port that just closed throws, which is fine.
+function postToPanel( tabId, message ) {
+
+	const port = connections.get( tabId );
+	if ( port === undefined ) return;
+
+	try {
+
+		port.postMessage( message );
+
+	} catch ( error ) {
+
+		// Port already disconnected
+
+	}
 
 }
 
@@ -51,16 +70,18 @@ chrome.runtime.onConnect.addListener( ( port ) => {
 
 		} else if ( FORWARDABLE_MESSAGES.has( message.name ) ) {
 
-			chrome.tabs.sendMessage( tabId, message );
+			chrome.tabs.sendMessage( tabId, message ).catch( () => {} );
 
 		}
 
 	} );
 
-	// Clean up when devtools is closed
+	// Clean up when devtools is closed, the expanded objects are no longer drawn over the page
 	port.onDisconnect.addListener( () => {
 
 		connections.delete( tabId );
+
+		if ( tabId !== undefined ) chrome.tabs.sendMessage( tabId, { name: MESSAGE_SELECT_OBJECTS, uuids: [] } ).catch( () => {} );
 
 	} );
 
@@ -76,6 +97,8 @@ chrome.runtime.onMessage.addListener( ( message, sender ) => {
 				128: `icons/128-${message.scheme}.png`
 			}
 		} );
+
+		return;
 
 	}
 
@@ -93,24 +116,9 @@ chrome.runtime.onMessage.addListener( ( message, sender ) => {
 
 	}
 
-	const port = connections.get( tabId );
-
-	if ( port !== undefined ) {
-
-		// The panel keeps track of which frame each renderer and scene came from
-		message.frameId = sender.frameId;
-
-		try {
-
-			port.postMessage( message );
-
-		} catch ( error ) {
-
-			// Port already disconnected
-
-		}
-
-	}
+	// The panel keeps track of which frame each renderer and scene came from
+	message.frameId = sender.frameId;
+	postToPanel( tabId, message );
 
 } );
 
@@ -119,12 +127,6 @@ chrome.webNavigation.onCommitted.addListener( ( { tabId, frameId } ) => {
 
 	if ( frameId === 0 ) clearBadge( tabId );
 
-	const port = connections.get( tabId );
-
-	if ( port !== undefined ) {
-
-		port.postMessage( { id: MESSAGE_ID, name: EVENT_COMMITTED, frameId: frameId } );
-
-	}
+	postToPanel( tabId, { name: EVENT_COMMITTED, frameId: frameId } );
 
 } );

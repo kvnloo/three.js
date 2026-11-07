@@ -1,4 +1,4 @@
-import { LoadingManager } from 'three';
+import { Cache, LoadingManager } from 'three';
 import { USDLoader } from '../../../../examples/jsm/loaders/USDLoader.js';
 import { USDComposer, SpecType } from '../../../../examples/jsm/loaders/usd/USDComposer.js';
 import { USDAParser } from '../../../../examples/jsm/loaders/usd/USDAParser.js';
@@ -9,6 +9,70 @@ export default QUnit.module( 'Addons', () => {
 	QUnit.module( 'Loaders', () => {
 
 		QUnit.module( 'USDLoader', () => {
+
+			QUnit.test( 'textures inherit CORS, resolve URLs once, and use the loading manager and image cache', async ( assert ) => {
+
+				const url = '/examples/textures/uv_grid_opengl.jpg?usd-loader-settings';
+				const manager = new LoadingManager();
+				let completed = 0;
+				manager.onLoad = () => completed ++;
+				manager.setURLModifier( ( requestedURL ) => {
+
+					assert.strictEqual( requestedURL, 'textures/image.png', 'The URL modifier receives the unresolved texture URL once per load.' );
+					return url;
+
+				} );
+				const enabled = Cache.enabled;
+				Cache.enabled = true;
+
+				try {
+
+					const composer = new USDComposer( manager );
+					composer.imageLoader.setCrossOrigin( 'use-credentials' );
+					const texture = composer._createTextureFromData( 'textures/image.png', null, null );
+					await Promise.all( composer.texturePromises );
+
+					assert.ok( texture.image.naturalWidth > 0 );
+					assert.strictEqual( texture.image.crossOrigin, 'use-credentials' );
+					assert.strictEqual( completed, 1, 'The loading manager observes texture completion.' );
+					assert.strictEqual( Cache.get( `image:${ url }` ), texture.image, 'The image participates in the shared cache.' );
+
+					const secondComposer = new USDComposer( manager );
+					secondComposer.imageLoader.setCrossOrigin( 'use-credentials' );
+					const secondTexture = secondComposer._createTextureFromData( 'textures/image.png', null, null );
+					await Promise.all( secondComposer.texturePromises );
+					assert.strictEqual( secondTexture.image, texture.image, 'Repeated texture loads reuse the cached image.' );
+					assert.strictEqual( completed, 2, 'Cached loads also notify the loading manager.' );
+
+				} finally {
+
+					Cache.remove( `image:${ url }` );
+					Cache.enabled = enabled;
+
+				}
+
+			} );
+
+			QUnit.test( 'strips USDA block comments', ( assert ) => {
+
+				const parser = new USDAParser();
+
+				assert.strictEqual( parser._stripBlockComments( '/* x */a/* y */b/**/c' ), 'abc', 'Multiple and empty comments are removed.' );
+				assert.strictEqual( parser._stripBlockComments( 'a */ b /*/ c */ d' ), 'a */ b  d', 'A stray closer is kept and the closer search starts after the opener.' );
+				assert.strictEqual( parser._stripBlockComments( 'a /* unclosed' ), 'a ', 'An unclosed comment extends to the end.' );
+				assert.strictEqual( parser._stripBlockComments( 'a = "x /* y" /* c */b' ), 'a = "x /* y" b', 'A /* inside a string is text.' );
+
+			} );
+
+			QUnit.test( 'collapses USDA triple-quoted strings into single lines', ( assert ) => {
+
+				const parser = new USDAParser();
+
+				assert.strictEqual( parser._collapseTripleQuotedStrings( 'b = \'\'\'x\r\ny\'\'\' c = """z"""' ), 'b = \'\'\'x\\ny\'\'\' c = """z"""', 'Both quote types are collapsed, removing \\r and escaping \\n.' );
+				assert.strictEqual( parser._collapseTripleQuotedStrings( 'c = """ it\'s \'\'\' inside """' ), 'c = """ it\'s \'\'\' inside """', 'The other quote type does not close the string.' );
+				assert.strictEqual( parser._collapseTripleQuotedStrings( 'd = """unclosed\nend' ), 'd = """unclosed\\nend', 'An unclosed string extends to the end.' );
+
+			} );
 
 			QUnit.test( 'reads the USDC string table after its count prefix', ( assert ) => {
 
@@ -199,6 +263,42 @@ def Xform "Root"
 
 			} );
 
+			QUnit.test( 'interprets USD color3f material inputs as linear', ( assert ) => {
+
+				const usda = `#usda 1.0
+(
+	defaultPrim = "Root"
+)
+
+def Xform "Root"
+{
+	def Material "Material"
+	{
+		token outputs:surface.connect = </Root/Material/PreviewSurface.outputs:surface>
+
+		def Shader "PreviewSurface"
+		{
+			uniform token info:id = "UsdPreviewSurface"
+			color3f inputs:diffuseColor = (0.18, 0.18, 0.18)
+			color3f inputs:emissiveColor = (0.18, 0.18, 0.18)
+			token outputs:surface
+		}
+	}
+
+	def Cube "Mesh"
+	{
+		rel material:binding = </Root/Material>
+	}
+}`;
+
+				const scene = new USDLoader().parse( usda );
+				const mesh = scene.getObjectByName( 'Mesh' );
+
+				assert.closeTo( mesh.material.color.r, 0.18, 0.000001, 'Diffuse color is kept in linear Rec.709.' );
+				assert.closeTo( mesh.material.emissive.r, 0.18, 0.000001, 'Emissive color is kept in linear Rec.709.' );
+
+			} );
+
 			QUnit.test( 'uses timeCodesPerSecond for USDA animation timing', ( assert ) => {
 
 				const usda = `#usda 1.0
@@ -234,6 +334,47 @@ def Xform "Root"
 					Array.from( track.times ),
 					[ 0, 1 ],
 					'Time samples are converted to seconds.'
+				);
+
+			} );
+
+			QUnit.test( 'keeps USDA time samples at negative time codes', ( assert ) => {
+
+				const usda = `#usda 1.0
+(
+	defaultPrim = "Root"
+	timeCodesPerSecond = 10
+	startTimeCode = -10
+	endTimeCode = 10
+)
+
+def Xform "Root"
+{
+	def Xform "Animated"
+	{
+		float3 xformOp:translate.timeSamples = {
+			-10: (0, 0, 0),
+			-2.5: (1, 0, 0),
+			10: (2, 0, 0),
+		}
+		uniform token[] xformOpOrder = ["xformOp:translate"]
+	}
+}`;
+
+				const { specsByPath } = new USDAParser().parseData( usda );
+
+				assert.deepEqual(
+					specsByPath[ '/Root/Animated.xformOp:translate' ].fields.timeSamples.times,
+					[ - 10, - 2.5, 10 ],
+					'Negative time codes are kept.'
+				);
+
+				const track = new USDLoader().parse( usda ).animations[ 0 ].tracks[ 0 ];
+
+				assert.deepEqual(
+					Array.from( track.times ),
+					[ - 1, - 0.25, 1 ],
+					'Every time sample becomes a keyframe.'
 				);
 
 			} );

@@ -1,7 +1,8 @@
 import ChainMap from './ChainMap.js';
 import RenderObject from './RenderObject.js';
 
-const _chainKeys = [];
+const _chainKeys = [ null, null, null, null ];
+const _overrideChainKeys = [ null, null, null, null, null ];
 
 /**
  * This module manages the render objects of the renderer.
@@ -100,30 +101,39 @@ class RenderObjects {
 
 		const chainMap = this.getChainMap( passId );
 
+		const sourceMaterial = this.renderer._currentSourceMaterial;
+		const sourceMaterialVersion = sourceMaterial !== null ? sourceMaterial.version : 0;
+
 		// set chain keys
 
-		_chainKeys[ 0 ] = object;
-		_chainKeys[ 1 ] = material;
-		_chainKeys[ 2 ] = renderContext;
-		_chainKeys[ 3 ] = lightsNode;
+		const chainKeys = sourceMaterial !== null ? _overrideChainKeys : _chainKeys;
+
+		chainKeys[ 0 ] = object;
+		chainKeys[ 1 ] = material;
+		chainKeys[ 2 ] = renderContext;
+		chainKeys[ 3 ] = lightsNode;
+
+		if ( sourceMaterial !== null ) chainKeys[ 4 ] = sourceMaterial;
 
 		//
 
-		let renderObject = chainMap.get( _chainKeys );
+		let renderObject = chainMap.get( chainKeys );
 
 		if ( renderObject === undefined ) {
 
 			renderObject = this.createRenderObject( this.nodes, this.geometries, this.renderer, object, material, scene, camera, lightsNode, renderContext, clippingContext, passId );
 
-			chainMap.set( _chainKeys, renderObject );
+			chainMap.set( chainKeys, renderObject );
 
 		} else {
+
+			let force = false;
 
 			// update references
 
 			renderObject.camera = camera;
 
-			//
+			// clipping and geometry updates
 
 			renderObject.updateClipping( clippingContext );
 
@@ -131,9 +141,19 @@ class RenderObjects {
 
 				renderObject.setGeometry( object.geometry );
 
+				// structural change, force into rebuild
+
+				if ( renderObject.initialGeometryCacheKey !== renderObject.getGeometryCacheKey() ) {
+
+					force = true;
+
+				}
+
 			}
 
-			if ( renderObject.version !== material.version || renderObject.needsUpdate ) {
+			// check if a new render object (rebuild) is required
+
+			if ( renderObject.version !== material.version || renderObject.sourceMaterialVersion !== sourceMaterialVersion || renderObject.needsUpdate || force ) {
 
 				if ( renderObject.initialCacheKey !== renderObject.getCacheKey() ) {
 
@@ -144,6 +164,7 @@ class RenderObjects {
 				} else {
 
 					renderObject.version = material.version;
+					renderObject.sourceMaterialVersion = sourceMaterialVersion;
 
 				}
 
@@ -153,10 +174,12 @@ class RenderObjects {
 
 		// reset chain array
 
-		_chainKeys[ 0 ] = null;
-		_chainKeys[ 1 ] = null;
-		_chainKeys[ 2 ] = null;
-		_chainKeys[ 3 ] = null;
+		chainKeys[ 0 ] = null;
+		chainKeys[ 1 ] = null;
+		chainKeys[ 2 ] = null;
+		chainKeys[ 3 ] = null;
+
+		if ( sourceMaterial !== null ) chainKeys[ 4 ] = null;
 
 		//
 
@@ -217,6 +240,7 @@ class RenderObjects {
 
 		renderObject.onDispose = () => {
 
+			this.geometries.deleteVertexState( renderObject );
 			this.pipelines.delete( renderObject );
 			this.bindings.deleteForRender( renderObject );
 			this.nodes.delete( renderObject );

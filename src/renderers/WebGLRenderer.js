@@ -20,6 +20,7 @@ import {
 } from '../constants.js';
 import { Color } from '../math/Color.js';
 import { Frustum } from '../math/Frustum.js';
+import { FrustumArray } from '../math/FrustumArray.js';
 import { Matrix4 } from '../math/Matrix4.js';
 import { Vector3 } from '../math/Vector3.js';
 import { Vector4 } from '../math/Vector4.js';
@@ -130,7 +131,7 @@ class WebGLRenderer {
 
 		const uintClearColor = new Uint32Array( 4 );
 		const intClearColor = new Int32Array( 4 );
-		const objectPosition = new Vector3();
+		const lightProbeGridUniforms = { textures: [], min: [], max: [], resolution: [] };
 
 		let currentRenderList = null;
 		let currentRenderState = null;
@@ -341,6 +342,7 @@ class WebGLRenderer {
 		// frustum
 
 		const _frustum = new Frustum();
+		const _frustumArray = new FrustumArray();
 
 		// clipping
 
@@ -817,7 +819,7 @@ class WebGLRenderer {
 
 			}
 
-			state.viewport( _currentViewport.copy( _viewport ).multiplyScalar( _pixelRatio ).round() );
+			state.viewport( _currentViewport.copy( _viewport ).multiplyScalar( getTargetPixelRatio() ).round() );
 
 		};
 
@@ -854,7 +856,7 @@ class WebGLRenderer {
 
 			}
 
-			state.scissor( _currentScissor.copy( _scissor ).multiplyScalar( _pixelRatio ).round() );
+			state.scissor( _currentScissor.copy( _scissor ).multiplyScalar( getTargetPixelRatio() ).round() );
 
 		};
 
@@ -1092,9 +1094,11 @@ class WebGLRenderer {
 			background.dispose();
 			renderLists.dispose();
 			renderStates.dispose();
+			textures.dispose();
 			properties.dispose();
 			environments.dispose();
 			objects.dispose();
+			geometries.dispose();
 			bindingStates.dispose();
 			uniformsGroups.dispose();
 			programCache.dispose();
@@ -1355,9 +1359,11 @@ class WebGLRenderer {
 
 		// Compile
 
-		function prepareMaterial( material, scene, object ) {
+		function prepareMaterial( material, scene, camera, object ) {
 
 			if ( _nodesHandler !== null && material.isNodeMaterial ) _nodesHandler.setObject( object, material );
+
+			if ( _clippingEnabled === true ) clipping.setState( material, camera, false );
 
 			if ( material.transparent === true && material.side === DoubleSide && material.forceSinglePass === false ) {
 
@@ -1442,6 +1448,11 @@ class WebGLRenderer {
 			currentRenderState.setupLights();
 			if ( _nodesHandler !== null ) _nodesHandler.updateLights( currentRenderState.state.lightsArray );
 
+			_localClippingEnabled = this.localClippingEnabled;
+			_clippingEnabled = clipping.init( this.clippingPlanes, _localClippingEnabled );
+
+			if ( _clippingEnabled === true ) clipping.setGlobalState( this.clippingPlanes, camera );
+
 			// node materials reference the shadow map when they are built, so it must exist by now
 
 			if ( _nodesHandler !== null ) shadowMap.render( currentRenderState.state.shadowsArray, targetScene, camera );
@@ -1468,14 +1479,14 @@ class WebGLRenderer {
 
 							const material2 = material[ i ];
 
-							prepareMaterial( material2, targetScene, object );
+							prepareMaterial( material2, targetScene, camera, object );
 							materials.add( material2 );
 
 						}
 
 					} else {
 
-						prepareMaterial( material, targetScene, object );
+						prepareMaterial( material, targetScene, camera, object );
 						materials.add( material );
 
 					}
@@ -1677,7 +1688,16 @@ class WebGLRenderer {
 			renderStateStack.push( currentRenderState );
 
 			_projScreenMatrix.multiplyMatrices( camera.projectionMatrix, camera.matrixWorldInverse );
-			_frustum.setFromProjectionMatrix( _projScreenMatrix, WebGLCoordinateSystem, camera.reversedDepth );
+
+			if ( camera.isArrayCamera ) {
+
+				_frustumArray.setFromArrayCamera( camera );
+
+			} else {
+
+				_frustum.setFromProjectionMatrix( _projScreenMatrix, WebGLCoordinateSystem, camera.reversedDepth );
+
+			}
 
 			_localClippingEnabled = this.localClippingEnabled;
 			_clippingEnabled = clipping.init( this.clippingPlanes, _localClippingEnabled );
@@ -1686,6 +1706,8 @@ class WebGLRenderer {
 			currentRenderList.init();
 
 			renderListStack.push( currentRenderList );
+
+			this.info.render.frame ++; // increment before projectObject(), see #35099
 
 			if ( xr.enabled === true && xr.isPresenting === true ) {
 
@@ -1718,8 +1740,6 @@ class WebGLRenderer {
 			}
 
 			//
-
-			this.info.render.frame ++;
 
 			if ( this.info.autoReset === true ) this.info.reset();
 
@@ -1866,10 +1886,6 @@ class WebGLRenderer {
 
 					if ( object.autoUpdate === true ) object.update( camera );
 
-				} else if ( object.isLightProbeGrid ) {
-
-					currentRenderState.pushLightProbeGrid( object );
-
 				} else if ( object.isLight ) {
 
 					currentRenderState.pushLight( object );
@@ -1882,7 +1898,9 @@ class WebGLRenderer {
 
 				} else if ( object.isSprite ) {
 
-					if ( ! object.frustumCulled || object.intersectsFrustum( _frustum ) ) {
+					const frustum = camera.isArrayCamera ? _frustumArray : _frustum;
+
+					if ( ! object.frustumCulled || object.intersectsFrustum( frustum ) ) {
 
 						if ( sortObjects ) {
 
@@ -1904,7 +1922,9 @@ class WebGLRenderer {
 
 				} else if ( object.isMesh || object.isLine || object.isPoints ) {
 
-					if ( ! object.frustumCulled || object.intersectsFrustum( _frustum ) ) {
+					const frustum = camera.isArrayCamera ? _frustumArray : _frustum;
+
+					if ( ! object.frustumCulled || object.intersectsFrustum( frustum ) ) {
 
 						const geometry = objects.update( object );
 						const material = object.material;
@@ -2177,6 +2197,16 @@ class WebGLRenderer {
 
 		}
 
+		function countLightProbeGrids( grids ) {
+
+			let count = 0;
+
+			for ( const grid of grids ) if ( grid.texture !== null ) count ++;
+
+			return count;
+
+		}
+
 		function getProgram( material, scene, object ) {
 
 			if ( scene.isScene !== true ) scene = _emptyScene; // scene could be a Mesh, Line, Points, ...
@@ -2210,6 +2240,7 @@ class WebGLRenderer {
 
 				programs = new Map();
 				materialProperties.programs = programs;
+				materialProperties.programVariants = new Map();
 
 			}
 
@@ -2291,10 +2322,37 @@ class WebGLRenderer {
 
 			}
 
-			materialProperties.lightProbeGrid = currentRenderState.state.lightProbeGridArray.length > 0;
+			materialProperties.numLightProbeGrids = countLightProbeGrids( currentRenderState.state.lightProbeGridArray );
 
 			materialProperties.currentProgram = program;
 			materialProperties.uniformsList = null;
+
+			return program;
+
+		}
+
+		function getProgramVariant( material, scene, object, colorSpace, toneMapping ) {
+
+			const materialProperties = properties.get( material );
+
+			const programVariantKey = materialProperties.currentProgram.id + ',' + colorSpace + ',' + toneMapping;
+
+			let program = materialProperties.programVariants.get( programVariantKey );
+
+			if ( program === undefined ) {
+
+				program = getProgram( material, scene, object );
+
+				materialProperties.programVariants.set( programVariantKey, program );
+
+			} else {
+
+				materialProperties.currentProgram = program;
+				materialProperties.uniformsList = null;
+				materialProperties.outputColorSpace = colorSpace;
+				materialProperties.toneMapping = toneMapping;
+
+			}
 
 			return program;
 
@@ -2333,30 +2391,6 @@ class WebGLRenderer {
 			materialProperties.vertexAlphas = parameters.vertexAlphas;
 			materialProperties.vertexTangents = parameters.vertexTangents;
 			materialProperties.toneMapping = parameters.toneMapping;
-
-		}
-
-		function findLightProbeGrid( volumes, object ) {
-
-			if ( volumes.length === 0 ) return null;
-
-			if ( volumes.length === 1 ) {
-
-				return volumes[ 0 ].texture !== null ? volumes[ 0 ] : null;
-
-			}
-
-			objectPosition.setFromMatrixPosition( object.matrixWorld );
-
-			for ( let i = 0, l = volumes.length; i < l; i ++ ) {
-
-				const v = volumes[ i ];
-
-				if ( v.texture !== null && v.boundingBox.containsPoint( objectPosition ) ) return v;
-
-			}
-
-			return null;
 
 		}
 
@@ -2415,14 +2449,11 @@ class WebGLRenderer {
 			//
 
 			let needsProgramChange = false;
+			let needsProgramVariant = false;
 
 			if ( material.version === materialProperties.__version ) {
 
 				if ( materialProperties.needsLights && ( materialProperties.lightsStateVersion !== lights.state.version ) ) {
-
-					needsProgramChange = true;
-
-				} else if ( materialProperties.outputColorSpace !== colorSpace ) {
 
 					needsProgramChange = true;
 
@@ -2508,17 +2539,17 @@ class WebGLRenderer {
 
 					needsProgramChange = true;
 
-				} else if ( materialProperties.toneMapping !== toneMapping ) {
-
-					needsProgramChange = true;
-
 				} else if ( materialProperties.morphTargetsCount !== morphTargetsCount ) {
 
 					needsProgramChange = true;
 
-				} else if ( !! materialProperties.lightProbeGrid !== ( currentRenderState.state.lightProbeGridArray.length > 0 ) ) {
+				} else if ( materialProperties.numLightProbeGrids !== countLightProbeGrids( currentRenderState.state.lightProbeGridArray ) ) {
 
 					needsProgramChange = true;
+
+				} else if ( materialProperties.outputColorSpace !== colorSpace || materialProperties.toneMapping !== toneMapping ) {
+
+					needsProgramVariant = true;
 
 				}
 
@@ -2533,9 +2564,9 @@ class WebGLRenderer {
 
 			let program = materialProperties.currentProgram;
 
-			if ( needsProgramChange === true ) {
+			if ( needsProgramChange === true || needsProgramVariant === true ) {
 
-				program = getProgram( material, scene, object );
+				program = ( needsProgramVariant === true ) ? getProgramVariant( material, scene, object, colorSpace, toneMapping ) : getProgram( material, scene, object );
 
 				// notify the node builder that the program has changed so uniforms and update nodes can
 				// be cached and triggered.
@@ -2567,19 +2598,6 @@ class WebGLRenderer {
 				_currentMaterialId = material.id;
 
 				refreshMaterial = true;
-
-			}
-
-			if ( materialProperties.needsLights ) {
-
-				const objectVolume = findLightProbeGrid( currentRenderState.state.lightProbeGridArray, object );
-
-				if ( materialProperties.lightProbeGrid !== objectVolume ) {
-
-					materialProperties.lightProbeGrid = objectVolume;
-					refreshMaterial = true;
-
-				}
 
 			}
 
@@ -2770,14 +2788,29 @@ class WebGLRenderer {
 
 				// light probe volume
 
-				if ( materialProperties.needsLights && materialProperties.lightProbeGrid ) {
+				if ( materialProperties.needsLights && materialProperties.numLightProbeGrids > 0 ) {
 
-					const volume = materialProperties.lightProbeGrid;
+					const grids = lightProbeGridUniforms;
+					let count = 0;
 
-					m_uniforms.probesSH.value = volume.texture;
-					m_uniforms.probesMin.value.copy( volume.boundingBox.min );
-					m_uniforms.probesMax.value.copy( volume.boundingBox.max );
-					m_uniforms.probesResolution.value.copy( volume.resolution );
+					for ( const grid of currentRenderState.state.lightProbeGridArray ) {
+
+						if ( grid.texture === null ) continue;
+
+						grids.textures[ count ] = grid.texture;
+						grids.min[ count ] = grid.boundingBox.min;
+						grids.max[ count ] = grid.boundingBox.max;
+						grids.resolution[ count ] = grid.resolution;
+						count ++;
+
+					}
+
+					for ( const key in grids ) grids[ key ].length = count;
+
+					m_uniforms.probesSH.value = grids.textures;
+					m_uniforms.probesMin.value = grids.min;
+					m_uniforms.probesMax.value = grids.max;
+					m_uniforms.probesResolution.value = grids.resolution;
 
 				}
 
@@ -3137,6 +3170,9 @@ class WebGLRenderer {
 
 				framebuffer = framebuffer[ activeCubeFaceIndex ];
 
+				// Custom mip chains store one framebuffer per level; read level 0.
+				if ( Array.isArray( framebuffer ) ) framebuffer = framebuffer[ 0 ];
+
 			}
 
 			if ( framebuffer ) {
@@ -3218,6 +3254,9 @@ class WebGLRenderer {
 			if ( renderTarget.isWebGLCubeRenderTarget && activeCubeFaceIndex !== undefined ) {
 
 				framebuffer = framebuffer[ activeCubeFaceIndex ];
+
+				// Custom mip chains store one framebuffer per level; read level 0.
+				if ( Array.isArray( framebuffer ) ) framebuffer = framebuffer[ 0 ];
 
 			}
 
@@ -3344,8 +3383,8 @@ class WebGLRenderer {
 			} else {
 
 				const levelScale = Math.pow( 2, - srcLevel );
-				width = Math.floor( image.width * levelScale );
-				height = Math.floor( image.height * levelScale );
+				width = Math.floor( srcTexture.width * levelScale );
+				height = Math.floor( srcTexture.height * levelScale );
 				if ( srcTexture.isDataArrayTexture ) {
 
 					depth = image.depth;
@@ -3443,7 +3482,7 @@ class WebGLRenderer {
 
 					}
 
-					_gl.blitFramebuffer( minX, minY, width, height, dstX, dstY, width, height, _gl.DEPTH_BUFFER_BIT, _gl.NEAREST );
+					_gl.blitFramebuffer( minX, minY, minX + width, minY + height, dstX, dstY, dstX + width, dstY + height, _gl.DEPTH_BUFFER_BIT, _gl.NEAREST );
 
 				}
 
@@ -3486,7 +3525,7 @@ class WebGLRenderer {
 					// copy the data using the fastest function that can achieve the copy
 					if ( srcLevel !== 0 ) {
 
-						_gl.blitFramebuffer( minX, minY, width, height, dstX, dstY, width, height, _gl.COLOR_BUFFER_BIT, _gl.NEAREST );
+						_gl.blitFramebuffer( minX, minY, minX + width, minY + height, dstX, dstY, dstX + width, dstY + height, _gl.COLOR_BUFFER_BIT, _gl.NEAREST );
 
 					} else if ( isDst3D ) {
 
@@ -3515,7 +3554,7 @@ class WebGLRenderer {
 
 					} else if ( dstTexture.isCompressedArrayTexture ) {
 
-						_gl.compressedTexSubImage3D( glTarget, dstLevel, dstX, dstY, dstZ, width, height, depth, glFormat, image.data );
+						_gl.compressedTexSubImage3D( glTarget, dstLevel, dstX, dstY, dstZ, image.width, image.height, depth, glFormat, image.data );
 
 					} else {
 
@@ -3552,7 +3591,7 @@ class WebGLRenderer {
 			state.pixelStorei( _gl.UNPACK_SKIP_IMAGES, currentUnpackSkipImages );
 
 			// Generate mipmaps only when copying level 0
-			if ( dstLevel === 0 && dstTexture.generateMipmaps ) {
+			if ( dstLevel === 0 && dstTexture.generateMipmaps === true && dstTexture.mipmapsAutoUpdate === true ) {
 
 				_gl.generateMipmap( glTarget );
 
@@ -3691,6 +3730,7 @@ class WebGLRenderer {
  * @property {boolean} [depth=true] Whether the drawing buffer has a depth buffer of at least 16 bits.
  * @property {boolean} [logarithmicDepthBuffer=false] Whether to use a logarithmic depth buffer. It may be necessary to use this if dealing with huge differences in scale in a single scene.
  * Note that this setting uses `gl_FragDepth` if available which disables the Early Fragment Test optimization and can cause a decrease in performance.
+ * It is ignored when a reversed depth buffer is in use.
  * @property {boolean} [reversedDepthBuffer=false] Whether to use a reverse depth buffer. Requires the `EXT_clip_control` extension.
  * This is a more faster and accurate version than logarithmic depth buffer.
  * @property {number} [outputBufferType=UnsignedByteType] Defines the type of the output buffer. Use `HalfFloatType` for HDR rendering with tone mapping and post-processing support.
@@ -3702,7 +3742,8 @@ class WebGLRenderer {
  * @typedef {Object} WebGLRenderer~Capabilities
  * @property {Function} getMaxAnisotropy - Returns the maximum available anisotropy.
  * @property {Function} getMaxPrecision - Returns the maximum available precision for vertex and fragment shaders.
- * @property {boolean} logarithmicDepthBuffer - `true` if `logarithmicDepthBuffer` was set to `true` in the constructor.
+ * @property {boolean} logarithmicDepthBuffer - `true` if `logarithmicDepthBuffer` was set to `true` in the constructor
+ * and no reversed depth buffer is in use.
  * @property {number} maxAttributes - The number of shader attributes that can be used by the vertex shader.
  * @property {number} maxCubemapSize - Maximum height * width of cube map textures that a shader can use.
  * @property {number} maxFragmentUniforms - The number of uniforms that can be used by a fragment shader.

@@ -1,4 +1,5 @@
-import { error } from '../../utils.js';
+import { error, warn } from '../../utils.js';
+import StackTrace from '../core/StackTrace.js';
 import Node from '../core/Node.js';
 
 /**
@@ -58,6 +59,12 @@ class ScopedVariableNode extends Node {
 
 	}
 
+	isCacheable( /*builder*/ ) {
+
+		return false;
+
+	}
+
 	/**
 	 * Sets the name of this node.
 	 *
@@ -67,6 +74,35 @@ class ScopedVariableNode extends Node {
 	setName( name ) {
 
 		this.name = name;
+
+		return this;
+
+	}
+
+	/**
+	 * Backwards-compatible name alias for workgroup arrays.
+	 *
+	 * @deprecated
+	 * @param {string} name - The name to set.
+	 * @return {ScopedVariableNode} A reference to this node.
+	 */
+	label( name ) {
+
+		warn( 'TSL: "label()" has been deprecated. Use "setName()" instead.', new StackTrace() );
+
+		return this.setName( name );
+
+	}
+
+	/**
+	 * Sets the variable address space.
+	 *
+	 * @param {string} scope - The address space.
+	 * @return {ScopedVariableNode} A reference to this node.
+	 */
+	setScope( scope ) {
+
+		this.scope = scope.toLowerCase();
 
 		return this;
 

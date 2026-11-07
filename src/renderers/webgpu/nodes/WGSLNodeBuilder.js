@@ -337,12 +337,13 @@ class WGSLNodeBuilder extends NodeBuilder {
 		this.directives = {};
 
 		/**
-		 * A map for managing variables scoped to specific address spaces.
-		 * Only relevant for when using {@link ScopedVariableNode} in context of compute shaders.
+		 * A map for managing variables scoped to shader address spaces.
+		 * Shared by legacy WorkgroupInfoNode and ScopedVariableNode.
 		 *
 		 * @type {Map<string,Object>}
 		 */
 		this.scopedVariables = new Map();
+		this.scopedArrays = this.scopedVariables; // Legacy direct WorkgroupInfoNode users.
 
 		/**
 		 * A flag that indicates that early returns are allowed.
@@ -909,6 +910,11 @@ class WGSLNodeBuilder extends NodeBuilder {
 
 		if ( shaderStage === 'fragment' ) {
 
+			// Unfilterable textures have no sampler binding. Use the same texel lookup as regular
+			// sampling, preserving nearest filtering, wrapping and offsets.
+
+			if ( this.isUnfilterable( texture ) ) return this.generateTexture( texture, textureProperty, uvSnippet, depthSnippet, offsetSnippet, shaderStage );
+
 			if ( depthSnippet ) {
 
 				if ( offsetSnippet ) {
@@ -996,6 +1002,42 @@ class WGSLNodeBuilder extends NodeBuilder {
 	 * @return {string} The WGSL snippet.
 	 */
 	generateTextureGather( texture, textureProperty, uvSnippet, gatherSnippet, depthSnippet, offsetSnippet ) {
+
+		const { primarySamples } = this.renderer.backend.utils.getTextureSampleData( texture );
+
+		if ( primarySamples > 1 ) {
+
+			// textureGather() has no overload for multisampled textures (e.g. the depth
+			// of a MSAA render target), so the four texels are fetched with textureLoad()
+
+			const textureDimension = this.generateTextureDimension( texture, textureProperty, '0u' );
+
+			let coordSnippet = `vec2<i32>( floor( ${ uvSnippet } * vec2<f32>( ${ textureDimension } ) - 0.5 ) )`;
+
+			if ( offsetSnippet ) {
+
+				coordSnippet = `${ coordSnippet } + ${ offsetSnippet }`;
+
+			}
+
+			const coord = new VarNode( new ExpressionNode( coordSnippet, 'ivec2' ) ).build( this );
+			const coordMax = `vec2<i32>( ${ textureDimension } ) - 1`;
+
+			const load = ( x, y ) => {
+
+				const snippet = this.generateTextureLoad( texture, textureProperty, `clamp( ${ coord } + vec2<i32>( ${ x }, ${ y } ), vec2<i32>( 0 ), ${ coordMax } )`, null, null, null );
+
+				return texture.isDepthTexture === true ? snippet : `${ snippet }[ ${ gatherSnippet } ]`;
+
+			};
+
+			// same texel order as textureGather()
+
+			const componentPrefix = this.getComponentTypeFromTexture( texture ).charAt( 0 );
+
+			return `vec4<${ componentPrefix }32>( ${ load( 0, 1 ) }, ${ load( 1, 1 ) }, ${ load( 1, 0 ) }, ${ load( 0, 0 ) } )`;
+
+		}
 
 		const componentSnippet = texture.isDepthTexture === true ? '' : `${gatherSnippet}, `;
 
@@ -1179,7 +1221,8 @@ class WGSLNodeBuilder extends NodeBuilder {
 
 			} else if ( type === 'buffer' || type === 'storageBuffer' || type === 'indirectStorageBuffer' ) {
 
-				if ( this.isCustomStruct( node ) ) {
+				// storage structs are bound directly rather than wrapped in an array
+				if ( node.node.isStorageStructNode === true ) {
 
 					return name;
 
@@ -1196,6 +1239,31 @@ class WGSLNodeBuilder extends NodeBuilder {
 		}
 
 		return super.getPropertyName( node );
+
+	}
+
+	/**
+	 * Returns the identifier the given node declares in the shader. Buffers are
+	 * accessed via `name.value` but declare `name` in the module scope.
+	 *
+	 * @param {Object} node - The node.
+	 * @return {string} The declaration name.
+	 */
+	getDeclarationName( node ) {
+
+		if ( node.isNodeUniform === true ) {
+
+			const type = node.type;
+
+			if ( type === 'buffer' || type === 'storageBuffer' || type === 'indirectStorageBuffer' ) {
+
+				return node.name;
+
+			}
+
+		}
+
+		return super.getDeclarationName( node );
 
 	}
 
@@ -1267,6 +1335,14 @@ class WGSLNodeBuilder extends NodeBuilder {
 					return NodeAccess.READ_ONLY;
 
 				}
+
+				return NodeAccess.READ_WRITE;
+
+			}
+
+			// Honor read-write for storage texture in the fragment stage.
+
+			if ( shaderStage === 'fragment' && node.isStorageTextureNode === true && node.access === NodeAccess.READ_WRITE ) {
 
 				return NodeAccess.READ_WRITE;
 
@@ -1375,27 +1451,14 @@ class WGSLNodeBuilder extends NodeBuilder {
 
 			} else if ( type === 'buffer' || type === 'storageBuffer' || type === 'indirectStorageBuffer' ) {
 
-				const sharedData = this.getSharedDataFromNode( node );
+				const bufferClass = type === 'buffer' ? NodeUniformBuffer : NodeStorageBuffer;
 
-				let buffer = sharedData.buffer;
-
-				if ( buffer === undefined ) {
-
-					const bufferClass = type === 'buffer' ? NodeUniformBuffer : NodeStorageBuffer;
-
-					buffer = new bufferClass( node, group );
-
-					sharedData.buffer = buffer;
-
-				}
-
-				buffer.setVisibility( buffer.getVisibility() | gpuShaderStageLib[ shaderStage ] );
+				const buffer = new bufferClass( node, group );
+				buffer.setVisibility( gpuShaderStageLib[ shaderStage ] );
 
 				bindings.push( buffer );
 
 				uniformGPU = buffer;
-
-				uniformNode.name = name ? name : 'NodeBuffer_' + uniformNode.id;
 
 			} else {
 
@@ -1712,20 +1775,17 @@ ${ flowData.code }
 	}
 
 	/**
-	 * Enables the 'subgroups' directive.
+	 * Enables subgroups.
 	 */
 	enableSubGroups() {
 
+		if ( this.renderer.hasFeature( 'subgroups' ) === false ) {
+
+			error( 'WGSLNodeBuilder: The \'subgroups\' feature is not supported by the current device.' );
+
+		}
+
 		this.enableDirective( 'subgroups' );
-
-	}
-
-	/**
-	 * Enables the 'subgroups-f16' directive.
-	 */
-	enableSubgroupsF16() {
-
-		this.enableDirective( 'subgroups-f16' );
 
 	}
 
@@ -1739,7 +1799,7 @@ ${ flowData.code }
 	}
 
 	/**
-	 * Enables the 'f16' directive.
+	 * Enables 16 bit floats.
 	 */
 	enableShaderF16() {
 
@@ -1748,7 +1808,7 @@ ${ flowData.code }
 	}
 
 	/**
-	 * Enables the 'dual_source_blending' directive.
+	 * Enables dual source blending.
 	 */
 	enableDualSourceBlending() {
 
@@ -1783,7 +1843,9 @@ ${ flowData.code }
 
 			for ( const { name, property, type } of builtins.values() ) {
 
-				snippets.push( `@builtin( ${name} ) ${property} : ${type}` );
+				const invariant = this.context.invariant === true && shaderStage === 'vertex' && name === 'position' ? '@invariant ' : '';
+
+				snippets.push( `${ invariant }@builtin( ${name} ) ${property} : ${type}` );
 
 			}
 
@@ -1794,26 +1856,20 @@ ${ flowData.code }
 	}
 
 	/**
-	 * This method should be used when a new scoped array buffer or variable
-	 * is used in context of compute shaders. It adds the scoped variable to an
-	 * internal data structure which is later used to generate the variable's WGSL.
+	 * Registers a scoped array or scalar for WGSL compute generation.
 	 *
-	 * @param {string} name - The array name.
-	 * @param {string} scope - The scope.
-	 * @param {string} bufferType - The buffer type.
-	 * @param {number|null} bufferCount - The buffer count of the scoped array.
-	 * @return {string} The array name.
+	 * @param {string} name - The shader variable name.
+	 * @param {string} scope - The WGSL address space.
+	 * @param {string} type - The TSL element/value type.
+	 * @param {?number} [count=null] - Array length or null for a scalar.
+	 * @param {boolean} [isAtomic=false] - Whether elements are atomic.
+	 * @return {string} The variable name.
 	 */
-	getScopedVariable( name, scope, type, count = null ) {
+	getScopedVariable( name, scope, type, count = null, isAtomic = false ) {
 
 		if ( this.scopedVariables.has( name ) === false ) {
 
-			this.scopedVariables.set( name, {
-				name,
-				scope,
-				type,
-				count
-			} );
+			this.scopedVariables.set( name, { name, scope, type, count, isAtomic } );
 
 		}
 
@@ -1822,20 +1878,30 @@ ${ flowData.code }
 	}
 
 	/**
-	 * Returns the scoped variables of the given shader stage as a WGSL string.
-	 * Used to construct shader variables with specialized scopes (workgroup/immediate, etc).
+	 * Compatibility entry point for direct WorkgroupInfoNode usage.
+	 *
+	 * @param {string} name - The array name.
+	 * @param {string} scope - The workgroup scope.
+	 * @param {string} bufferType - The array element type.
+	 * @param {number} bufferCount - The array length.
+	 * @param {boolean} [isAtomic=false] - Whether elements are atomic.
+	 * @return {string} The array name.
+	 */
+	getScopedArray( name, scope, bufferType, bufferCount, isAtomic = false ) {
+
+		return this.getScopedVariable( name, scope, bufferType, bufferCount, isAtomic );
+
+	}
+
+	/**
+	 * Returns declarations for scoped variables in compute shaders.
 	 *
 	 * @param {string} shaderStage - The shader stage.
-	 * @return {string|undefined} The WGSL snippet that defines the scoped arrays.
-	 * Returns `undefined` when used in the vertex or fragment stage.
+	 * @return {string|undefined} WGSL declarations or undefined outside compute.
 	 */
 	getScopedVariables( shaderStage ) {
 
-		if ( shaderStage !== 'compute' ) {
-
-			return;
-
-		}
+		if ( shaderStage !== 'compute' ) return;
 
 		const snippets = [];
 
@@ -1843,13 +1909,25 @@ ${ flowData.code }
 
 			let resolvedType = this.getType( type );
 
-			if ( isAtomic === true ) resolvedType = `atomic<${type}>`;
+			if ( isAtomic === true ) resolvedType = `atomic<${resolvedType}>`;
 
 			snippets.push( `${ this.getVar( resolvedType, name, count, `<${ scope }>` ) };` );
 
 		}
 
 		return snippets.join( '\n' );
+
+	}
+
+	/**
+	 * Compatibility entry point for existing callers of getScopedArrays().
+	 *
+	 * @param {string} shaderStage - The shader stage.
+	 * @return {string|undefined} WGSL declarations or undefined outside compute.
+	 */
+	getScopedArrays( shaderStage ) {
+
+		return this.getScopedVariables( shaderStage );
 
 	}
 
@@ -2001,6 +2079,48 @@ ${ flowData.code }
 	}
 
 	/**
+	 * Returns a single const variable statement as a WGSL string for the given variable type and name.
+	 *
+	 * @param {string} type - The variable's type.
+	 * @param {string} name - The variable's name.
+	 * @param {?number} [count=null] - The array length.
+	 * @return {string} The WGSL snippet that defines a const variable.
+	 */
+	generateConstStatement( type, name/*, count = null*/ ) {
+
+		return `const ${ name }`;
+
+	}
+
+	/**
+	 * Returns a single variable statement as a WGSL string for the given variable type and name.
+	 *
+	 * @param {string} type - The variable's type.
+	 * @param {string} name - The variable's name.
+	 * @param {?number} [count=null] - The array length.
+	 * @return {string} The WGSL snippet that defines a variable.
+	 */
+	generateVarStatement( type, name, count = null ) {
+
+		return this.getVar( type, name, count );
+
+	}
+
+	/**
+	 * Returns a runtime read-only variable statement as a WGSL string.
+	 *
+	 * @param {string} type - The variable's type.
+	 * @param {string} name - The variable's name.
+	 * @param {?number} [count=null] - The array length.
+	 * @return {string} The WGSL snippet that defines a let variable.
+	 */
+	generateLetStatement( type, name/*, count = null*/ ) {
+
+		return `let ${ name }`;
+
+	}
+
+	/**
 	 * Returns the variables of the given shader stage as a WGSL string.
 	 *
 	 * @param {string} shaderStage - The shader stage.
@@ -2100,21 +2220,6 @@ ${ flowData.code }
 
 	}
 
-	isCustomStruct( nodeUniform ) {
-
-		const attribute = nodeUniform.value;
-		const bufferNode = nodeUniform.node;
-
-		const isAttributeStructType = ( attribute.isBufferAttribute || attribute.isInstancedBufferAttribute ) && bufferNode.structTypeNode !== null;
-
-		const isStructArray =
-			( bufferNode.value && bufferNode.value.array ) &&
-			( typeof bufferNode.value.itemSize === 'number' && bufferNode.value.array.length > bufferNode.value.itemSize );
-
-		return isAttributeStructType && ! isStructArray;
-
-	}
-
 	/**
 	 * Returns the uniforms of the given shader stage as a WGSL string.
 	 *
@@ -2205,11 +2310,13 @@ ${ flowData.code }
 
 				} else if ( texture.isArrayTexture === true || texture.isDataArrayTexture === true || texture.isCompressedArrayTexture === true ) {
 
-					textureType = 'texture_2d_array<f32>';
+					const componentPrefix = this.getComponentTypeFromTexture( texture ).charAt( 0 );
+					textureType = `texture_2d_array<${ componentPrefix }32>`;
 
 				} else if ( texture.is3DTexture === true || texture.isData3DTexture === true ) {
 
-					textureType = 'texture_3d<f32>';
+					const componentPrefix = this.getComponentTypeFromTexture( texture ).charAt( 0 );
+					textureType = `texture_3d<${ componentPrefix }32>`;
 
 				} else {
 
@@ -2229,9 +2336,10 @@ ${ flowData.code }
 				const bufferCountSnippet = bufferCount > 0 && uniform.type === 'buffer' ? ', ' + bufferCount : '';
 				const bufferAccessMode = bufferNode.isStorageBufferNode ? `storage, ${ this.getStorageAccess( bufferNode, shaderStage ) }` : 'uniform';
 
-				if ( this.isCustomStruct( uniform ) ) {
+				if ( bufferNode.isStorageStructNode === true ) {
 
-					bufferSnippets.push( `@binding( ${ uniformIndexes.binding ++ } ) @group( ${ uniformIndexes.group } ) var<${ bufferAccessMode }> ${ uniform.name } : ${ bufferType };` );
+					// bound as the struct itself so it can end in a runtime-sized array
+					bufferSnippets.push( `@binding( ${ uniformIndexes.binding ++ } ) @group( ${ uniformIndexes.group } )\nvar<${ bufferAccessMode }> ${ uniform.name } : ${ bufferType };` );
 
 				} else {
 
@@ -2412,8 +2520,7 @@ ${ flowData.code }
 		} else {
 
 			// Early strictly validated in computeNode
-
-			const workgroupSize = this.object.workgroupSize;
+			const workgroupSize = this.compute.workgroupSize;
 
 			this.computeShader = this._getWGSLComputeCode( shadersData.compute, workgroupSize );
 
@@ -2636,6 +2743,9 @@ fn main( ${shaderData.attributes} ) -> VaryingsStruct {
 		return `${ this.getSignature() }
 // global
 ${ diagnostics }
+
+// directives
+${shaderData.directives}
 
 // structs
 ${shaderData.structs}
