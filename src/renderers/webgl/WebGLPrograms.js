@@ -51,7 +51,24 @@ function WebGLPrograms( renderer, environments, extensions, capabilities, bindin
 
 	}
 
-	function getParameters( material, lights, shadows, scene, object, lightProbeGrids ) {
+	function getRenderTargetSignature( renderTarget ) {
+
+	if ( renderTarget === null ) return '';
+
+	const signature = [];
+
+	for ( let i = 0, l = renderTarget.textures.length; i < l; i ++ ) {
+
+		const texture = renderTarget.textures[ i ];
+		signature.push( texture.uuid, texture.name, texture.type );
+
+	}
+
+	return JSON.stringify( signature );
+
+}
+
+function getParameters( material, lights, shadows, scene, object, lightProbeGrids ) {
 
 		const fog = scene.fog;
 		const geometry = object.geometry;
@@ -441,18 +458,8 @@ function WebGLPrograms( renderer, environments, extensions, capabilities, bindin
 			getProgramCacheKeyBooleans( array, parameters );
 			array.push( renderer.outputColorSpace );
 
-			// Shader outputs depend on the current render target
-			const currentRenderTarget = renderer.getRenderTarget();
-
-			if ( currentRenderTarget !== null ) {
-
-				for ( let i = 0, l = currentRenderTarget.textures.length; i < l; i ++ ) {
-
-					array.push( currentRenderTarget.textures[ i ].uuid );
-
-				}
-
-			}
+			// Include in-place name and type changes as well as texture replacements.
+			array.push( getRenderTargetSignature( parameters.renderTarget ) );
 
 		}
 
@@ -708,6 +715,7 @@ function WebGLPrograms( renderer, environments, extensions, capabilities, bindin
 	return {
 		getParameters: getParameters,
 		getProgramCacheKey: getProgramCacheKey,
+		getRenderTargetSignature: getRenderTargetSignature,
 		getUniforms: getUniforms,
 		acquireProgram: acquireProgram,
 		releaseProgram: releaseProgram,

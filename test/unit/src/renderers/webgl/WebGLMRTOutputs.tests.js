@@ -3,6 +3,7 @@ import { PlaneGeometry } from '../../../../../src/geometries/PlaneGeometry.js';
 import { ShaderMaterial } from '../../../../../src/materials/ShaderMaterial.js';
 import { Mesh } from '../../../../../src/objects/Mesh.js';
 import { Scene } from '../../../../../src/scenes/Scene.js';
+import { TextureSource } from '../../../../../src/textures/TextureSource.js';
 import { WebGLRenderTarget } from '../../../../../src/renderers/WebGLRenderTarget.js';
 import { WebGLRenderer } from '../../../../../src/renderers/WebGLRenderer.js';
 
@@ -98,6 +99,68 @@ export default QUnit.module( 'Renderers', () => {
 				try {
 
 					assert.deepEqual( renderPixel( harness, target, 1 ), [ 0, 255, 0, 255 ] );
+
+				} finally {
+
+					disposeHarness( harness, target );
+
+				}
+
+			} );
+
+			QUnit.test( 'renaming an attachment updates outputs on the same target', ( assert ) => {
+
+				const harness = createHarness();
+				const target = new WebGLRenderTarget( 1, 1, { count: 2 } );
+				target.textures[ 0 ].name = 'Color';
+				target.textures[ 1 ].name = 'Second';
+
+				try {
+
+					assert.deepEqual( renderPixel( harness, target, 1 ), [ 0, 255, 0, 255 ], 'original name' );
+					target.textures[ 1 ].name = 'Aux';
+					assert.deepEqual( renderPixel( harness, target, 1 ), [ 0, 0, 255, 255 ], 'new name, same target and texture' );
+					target.textures[ 1 ].name = 'Second';
+					assert.deepEqual( renderPixel( harness, target, 1 ), [ 0, 255, 0, 255 ], 'cached program restored' );
+
+				} finally {
+
+					disposeHarness( harness, target );
+
+				}
+
+			} );
+
+			QUnit.test( 'replacing an attachment rebinds its GPU texture', ( assert ) => {
+
+				const harness = createHarness();
+				const target = new WebGLRenderTarget( 1, 1, { count: 2 } );
+				target.textures[ 0 ].name = 'Color';
+				target.textures[ 1 ].name = 'Second';
+
+				try {
+
+					assert.deepEqual( renderPixel( harness, target, 1 ), [ 0, 255, 0, 255 ], 'original attachment' );
+
+					const gl = harness.renderer.getContext();
+					const previousAttachment = gl.getFramebufferAttachmentParameter( gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.FRAMEBUFFER_ATTACHMENT_OBJECT_NAME );
+					const allocatedTextures = harness.renderer.info.memory.textures;
+
+					const replacement = target.textures[ 1 ].clone();
+					replacement.source = new TextureSource( { width: 1, height: 1, depth: 1 } );
+					target.textures[ 1 ] = replacement;
+
+					assert.deepEqual( renderPixel( harness, target, 1 ), [ 0, 255, 0, 255 ], 'replacement with same name' );
+
+					const currentAttachment = gl.getFramebufferAttachmentParameter( gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.FRAMEBUFFER_ATTACHMENT_OBJECT_NAME );
+
+					assert.ok( previousAttachment, 'original GPU attachment exists' );
+					assert.ok( currentAttachment, 'replacement GPU attachment exists' );
+					assert.notStrictEqual( currentAttachment, previousAttachment, 'framebuffer points at a new GPU texture' );
+					assert.strictEqual( harness.renderer.info.memory.textures, allocatedTextures, 'replaced GPU texture was freed' );
+
+					replacement.name = 'Aux';
+					assert.deepEqual( renderPixel( harness, target, 1 ), [ 0, 0, 255, 255 ], 'new texture can also be renamed' );
 
 				} finally {
 

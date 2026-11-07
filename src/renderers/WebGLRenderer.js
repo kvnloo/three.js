@@ -2391,6 +2391,7 @@ class WebGLRenderer {
 			materialProperties.vertexTangents = parameters.vertexTangents;
 			materialProperties.toneMapping = parameters.toneMapping;
 			materialProperties.renderTarget = parameters.renderTarget;
+			materialProperties.renderTargetSignature = programCache.getRenderTargetSignature( parameters.renderTarget );
 
 		}
 
@@ -2547,7 +2548,8 @@ class WebGLRenderer {
 
 					needsProgramChange = true;
 
-				} else if ( materialProperties.renderTarget !== _currentRenderTarget ) {
+				} else if ( materialProperties.renderTarget !== _currentRenderTarget ||
+					materialProperties.renderTargetSignature !== programCache.getRenderTargetSignature( _currentRenderTarget ) ) {
 
 					needsProgramChange = true;
 
@@ -3002,7 +3004,7 @@ class WebGLRenderer {
 					// Color and depth texture must be rebound in order for the swapchain to update.
 					textures.rebindTextures( renderTarget, properties.get( renderTarget.texture ).__webglTexture, properties.get( renderTarget.depthTexture ).__webglTexture );
 
-				} else if ( renderTarget.depthBuffer ) {
+				} else if ( textures.updateRenderTargetAttachments( renderTarget ) === false && renderTarget.depthBuffer ) {
 
 					// check if the depth texture is already bound to the frame buffer and that it's been initialized
 					const depthTexture = renderTarget.depthTexture;
