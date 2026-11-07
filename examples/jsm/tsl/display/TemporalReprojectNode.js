@@ -608,7 +608,6 @@ class TemporalReprojectNode extends Node {
 
 	setViewOffset() {
 
-		this.camera.updateProjectionMatrix();
 		this._originalProjectionMatrix.copy( this.camera.projectionMatrix );
 		velocity.setProjectionMatrix( this._originalProjectionMatrix );
 
@@ -661,9 +660,6 @@ class TemporalReprojectNode extends Node {
 		let historySwappedForRestart = false;
 
 		if ( needsRestart === true ) {
-
-			renderer.initRenderTarget( this._historyRenderTarget );
-			renderer.initRenderTarget( this._resolveRenderTarget );
 
 			this._previousNormalTexture.dispose();
 			this._previousNormalTexture = this.normalNode.value.clone();

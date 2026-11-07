@@ -38,6 +38,9 @@ import { replaceSunLights, restoreSunLights } from './LightProbeGridUtils.js';
 // Probes captured per render, six sub-cameras each.
 const PROBES_PER_BATCH = 8;
 
+// Row blocks per face, so each probe's projection spreads over more fragments.
+const FACE_BLOCKS = 4;
+
 // Per-face forward, right and up vectors of the capture cameras.
 const FACE_FORWARD = [[ 1, 0, 0 ], [ - 1, 0, 0 ], [ 0, 1, 0 ], [ 0, - 1, 0 ], [ 0, 0, 1 ], [ 0, 0, - 1 ]];
 const FACE_RIGHT = [[ 0, 0, 1 ], [ 0, 0, - 1 ], [ - 1, 0, 0 ], [ - 1, 0, 0 ], [ - 1, 0, 0 ], [ 1, 0, 0 ]];
@@ -73,9 +76,9 @@ let _captureCamera = null;
 
 /**
  * Returns the output node for the spherical-harmonic projection pass. Each
- * fragment of a batch row integrates one SH coefficient over one captured cube
- * face, weighting every texel by its exact solid angle. Columns are ordered
- * `coefficient * 6 + face`; the repack pass sums the six faces.
+ * fragment of a batch row integrates one SH coefficient over one row block of a
+ * captured cube face, weighting every texel by its exact solid angle. Columns are ordered
+ * `( coefficient * 6 + face ) * FACE_BLOCKS + block`; the repack pass sums them.
  *
  * @private
  * @param {Node} faces - The face atlas texture node.
@@ -88,27 +91,30 @@ function projectSHNode( faces, size, batchStart ) {
 	return Fn( () => {
 
 		const column = int( screenCoordinate.x );
-		const coefIndex = column.div( 6 ).toVar();
-		const face = column.mod( 6 ).toVar();
+		const block = column.mod( FACE_BLOCKS );
+		const coefIndex = column.div( 6 * FACE_BLOCKS ).toVar();
+		const face = column.div( FACE_BLOCKS ).mod( 6 ).toVar();
 		const slot = int( screenCoordinate.y ).sub( batchStart );
+		const rows = size / FACE_BLOCKS;
+		const rowStart = block.mul( rows ).toVar();
 
 		const forward = array( FACE_FORWARD.map( ( v ) => vec3( ...v ) ) ).element( face ).toVar();
 		const right = array( FACE_RIGHT.map( ( v ) => vec3( ...v ) ) ).element( face ).toVar();
 		const up = array( FACE_UP.map( ( v ) => vec3( ...v ) ) ).element( face ).toVar();
 
-		const origin = ivec2( face.mul( size ), slot.mul( size ) ).toVar();
+		const origin = ivec2( face.mul( size ), slot.mul( size ).add( rowStart ) ).toVar();
 		const texelSize = 2.0 / size;
 		const accum = vec3( 0.0 ).toVar();
 
 		// Signed area of the projected face region from its center to ( x, y ).
 		const area = ( x, y ) => atan( x.mul( y ).div( x.mul( x ).add( y.mul( y ) ).add( 1.0 ).sqrt() ) );
 
-		Loop( size, size, ( { i, j } ) => {
+		Loop( size, rows, ( { i, j } ) => {
 
 			// Rows run top to bottom, so NDC y decreases with j.
 			const x0 = float( i ).mul( texelSize ).sub( 1.0 );
 			const x1 = x0.add( texelSize );
-			const y0 = float( 1.0 ).sub( float( j ).mul( texelSize ) );
+			const y0 = float( 1.0 ).sub( float( j.add( rowStart ) ).mul( texelSize ) );
 			const y1 = y0.sub( texelSize );
 
 			const solidAngle = area( x0, y0 ).sub( area( x0, y1 ) ).sub( area( x1, y0 ) ).add( area( x1, y1 ) ).abs();
@@ -168,11 +174,11 @@ function repackNode( batch, textureIndex, resolution, sliceZ ) {
 		const nz = int( resolution.z );
 		const probeIndex = ix.add( sliceZ.mul( nx ) ).add( iy.mul( nx ).mul( nz ) ).toVar();
 
-		// Sum the six face projections of each coefficient.
+		// Sum the face block projections of each coefficient.
 		const [ c0, c1, c2, c3, c4, c5, c6, c7, c8 ] = [ 0, 1, 2, 3, 4, 5, 6, 7, 8 ].map( ( c ) => {
 
-			let sum = batch.load( ivec2( c * 6, probeIndex ) );
-			for ( let f = 1; f < 6; f ++ ) sum = sum.add( batch.load( ivec2( c * 6 + f, probeIndex ) ) );
+			let sum = batch.load( ivec2( c * 6 * FACE_BLOCKS, probeIndex ) );
+			for ( let k = 1; k < 6 * FACE_BLOCKS; k ++ ) sum = sum.add( batch.load( ivec2( c * 6 * FACE_BLOCKS + k, probeIndex ) ) );
 			return sum;
 
 		} );
@@ -220,6 +226,7 @@ function ensureCaptureCamera( near, far ) {
 		}
 
 		_captureCamera = new ArrayCamera( cameras );
+		_captureCamera.perCameraFrustumCulled = true;
 
 	}
 
@@ -274,8 +281,8 @@ function ensureBakeTargets( cubemapSize, totalProbes ) {
 
 		if ( _batchTarget !== null ) _batchTarget.dispose();
 
-		// One row per probe: 9 coefficients x 6 faces.
-		_batchTarget = new RenderTarget( 9 * 6, totalProbes, {
+		// One row per probe: 9 coefficients x 6 faces x face blocks.
+		_batchTarget = new RenderTarget( 9 * 6 * FACE_BLOCKS, totalProbes, {
 			type: FloatType,
 			format: RGBAFormat,
 			minFilter: NearestFilter,
@@ -363,14 +370,16 @@ class LightProbeGrid extends Light {
 	/**
 	 * Constructs a new irradiance probe grid.
 	 *
-	 * The volume is centered at the object's position.
+	 * The volume is centered at the object's position. It is split into one cell
+	 * per probe, with each probe at the center of its cell, so the probes sit half
+	 * a cell inside the volume.
 	 *
 	 * @param {number} [width=1] - Full width of the volume along X.
 	 * @param {number} [height=1] - Full height of the volume along Y.
 	 * @param {number} [depth=1] - Full depth of the volume along Z.
-	 * @param {number} [widthProbes] - Number of probes along X. Defaults to `Math.max( 2, Math.round( width ) + 1 )`.
-	 * @param {number} [heightProbes] - Number of probes along Y. Defaults to `Math.max( 2, Math.round( height ) + 1 )`.
-	 * @param {number} [depthProbes] - Number of probes along Z. Defaults to `Math.max( 2, Math.round( depth ) + 1 )`.
+	 * @param {number} [widthProbes] - Number of probes along X. Defaults to `Math.max( 1, Math.round( width ) )`.
+	 * @param {number} [heightProbes] - Number of probes along Y. Defaults to `Math.max( 1, Math.round( height ) )`.
+	 * @param {number} [depthProbes] - Number of probes along Z. Defaults to `Math.max( 1, Math.round( depth ) )`.
 	 */
 	constructor( width = 1, height = 1, depth = 1, widthProbes, heightProbes, depthProbes ) {
 
@@ -414,13 +423,14 @@ class LightProbeGrid extends Light {
 		 * @type {Vector3}
 		 */
 		this.resolution = new Vector3(
-			widthProbes !== undefined ? widthProbes : Math.max( 2, Math.round( width ) + 1 ),
-			heightProbes !== undefined ? heightProbes : Math.max( 2, Math.round( height ) + 1 ),
-			depthProbes !== undefined ? depthProbes : Math.max( 2, Math.round( depth ) + 1 )
+			widthProbes !== undefined ? widthProbes : Math.max( 1, Math.round( width ) ),
+			heightProbes !== undefined ? heightProbes : Math.max( 1, Math.round( height ) ),
+			depthProbes !== undefined ? depthProbes : Math.max( 1, Math.round( depth ) )
 		);
 
 		/**
-		 * The world-space bounding box for the grid. Updated automatically
+		 * The world-space bounding box for the grid. This is the volume the grid
+		 * lights, with the probes half a cell inside it. Updated automatically
 		 * by {@link LightProbeGrid#bake}.
 		 *
 		 * @type {Box3}
@@ -428,22 +438,19 @@ class LightProbeGrid extends Light {
 		this.boundingBox = new Box3();
 
 		/**
-		 * Distance in world units over which the grid contribution fades out
-		 * past the volume boundary. `0` applies the contribution everywhere
-		 * (clamped), which matches a single-volume setup. Use a small positive
-		 * value to blend multiple overlapping grids.
+		 * Where grids overlap, the grid with the highest priority lights the
+		 * fragment. On ties, the most recently created grid wins.
 		 *
 		 * @type {number}
 		 * @default 0
 		 */
-		this.falloff = 0;
+		this.priority = 0;
 
 		/**
 		 * The single RGBA atlas 3D texture storing all seven packed SH
 		 * sub-volumes stacked along Z.
 		 *
 		 * @type {?Data3DTexture}
-		 * @default null
 		 */
 		this.texture = null;
 
@@ -461,6 +468,7 @@ class LightProbeGrid extends Light {
 		this._bouncePass = - 1;
 
 		this.updateBoundingBox();
+		this._ensureTextures();
 
 	}
 
@@ -480,9 +488,9 @@ class LightProbeGrid extends Light {
 		const w = this.width, h = this.height, d = this.depth;
 
 		target.set(
-			res.x > 1 ? pos.x - w / 2 + ix * w / ( res.x - 1 ) : pos.x,
-			res.y > 1 ? pos.y - h / 2 + iy * h / ( res.y - 1 ) : pos.y,
-			res.z > 1 ? pos.z - d / 2 + iz * d / ( res.z - 1 ) : pos.z
+			pos.x - w / 2 + ( ix + 0.5 ) * w / res.x,
+			pos.y - h / 2 + ( iy + 0.5 ) * h / res.y,
+			pos.z - d / 2 + ( iz + 0.5 ) * d / res.z
 		);
 
 		return target;
@@ -518,7 +526,7 @@ class LightProbeGrid extends Light {
 	 * @param {WebGPURenderer} renderer - The renderer.
 	 * @param {Scene} scene - The scene to render.
 	 * @param {Object} [options] - Bake options.
-	 * @param {number} [options.cubemapSize=8] - Resolution of each cubemap face.
+	 * @param {number} [options.cubemapSize=8] - Resolution of each cubemap face. Must be a multiple of 4.
 	 * @param {number} [options.near=0.1] - Near plane for the cube camera.
 	 * @param {number} [options.far=100] - Far plane for the cube camera.
 	 * @param {number} [options.bounces=0] - Additional bounce passes. Only available when baking the whole grid.
@@ -681,27 +689,20 @@ class LightProbeGrid extends Light {
 	 */
 	_updateBounceGrid( renderer, scene, pass, start ) {
 
-		if ( pass === 0 ) {
+		if ( this._bounceGrid === null ) {
 
-			if ( start === 0 ) this._bouncePass = - 1;
-			return;
+			const res = this.resolution;
+			this._bounceGrid = new LightProbeGrid( this.width, this.height, this.depth, res.x, res.y, res.z );
 
 		}
 
-		if ( start === 0 ) {
+		if ( pass === 0 ) {
+
+			if ( start === 0 ) this._bouncePass = - 1;
+
+		} else if ( start === 0 ) {
 
 			const renderTarget = this._renderTarget;
-
-			if ( this._bounceGrid === null ) {
-
-				const res = this.resolution;
-				this._bounceGrid = new LightProbeGrid( this.width, this.height, this.depth, res.x, res.y, res.z );
-				this._bounceGrid._ensureTextures();
-
-			}
-
-			renderer.initRenderTarget( renderTarget );
-			renderer.initRenderTarget( this._bounceGrid._renderTarget );
 			_copyRegion.min.set( 0, 0, 0 );
 			_copyRegion.max.set( renderTarget.width, renderTarget.height, renderTarget.depth );
 			renderer.copyTextureToTexture( renderTarget.texture, this._bounceGrid.texture, _copyRegion );
@@ -711,8 +712,9 @@ class LightProbeGrid extends Light {
 
 		const bounceGrid = this._bounceGrid;
 		bounceGrid.boundingBox.copy( this.boundingBox );
-		bounceGrid.intensity = this.intensity;
-		bounceGrid.falloff = this.falloff;
+		// The direct pass adds the grid unlit, so all passes share the lights and their shaders.
+		bounceGrid.intensity = pass === 0 ? 0 : this.intensity;
+		bounceGrid.priority = this.priority;
 		scene.add( bounceGrid );
 
 	}
@@ -779,7 +781,7 @@ class LightProbeGrid extends Light {
 
 			renderer.autoClear = false;
 			_batchStartUniform.value = batchStart;
-			_batchTarget.viewport.set( 0, batchStart, 9 * 6, batchCount );
+			_batchTarget.viewport.set( 0, batchStart, 9 * 6 * FACE_BLOCKS, batchCount );
 			renderer.setRenderTarget( _batchTarget );
 			_quad.material = _shMaterial;
 			_quad.render( renderer );
