@@ -2,6 +2,7 @@ import { Vector2 } from '../math/Vector2.js';
 import { MeshStandardMaterial } from './MeshStandardMaterial.js';
 import { Color } from '../math/Color.js';
 import { clamp } from '../math/MathUtils.js';
+import { warnOnce } from '../utils.js';
 
 /**
  * An extension of the {@link MeshStandardMaterial}, providing more advanced
@@ -12,6 +13,8 @@ import { clamp } from '../math/MathUtils.js';
  * - Clearcoat: Some materials — like car paints, carbon fiber, and wet surfaces — require
  * a clear, reflective layer on top of another layer that may be irregular or rough.
  * Clearcoat approximates this effect, without the need for a separate transparent surface.
+ * - Diffuse roughness: Produces the flatter appearance and enhanced backscattering of
+ * rough diffuse surfaces such as clay, concrete, and unpolished materials.
  * - Iridescence: Allows to render the effect where hue varies  depending on the viewing
  * angle and illumination angle. This can be seen on soap bubbles, oil films, or on the
  * wings of many insects.
@@ -19,6 +22,8 @@ import { clamp } from '../math/MathUtils.js';
  * transparent materials are less reflective. Physically-based transmission provides a more
  * realistic option for thin, transparent surfaces like glass.
  * - Advanced reflectivity: More flexible reflectivity for non-metallic materials.
+ * - Retroreflection: Redirects specular light back toward the light source for
+ * safety materials like road markings and reflective tape.
  * - Sheen: Can be used for representing cloth and fabric materials.
  *
  * As a result of these complex shading features, `MeshPhysicalMaterial` has a
@@ -68,7 +73,7 @@ class MeshPhysicalMaterial extends MeshStandardMaterial {
 		 * property provides additional rotation to the vectors in the texture.
 		 *
 		 * @type {number}
-		 * @default 1
+		 * @default 0
 		 */
 		this.anisotropyRotation = 0;
 
@@ -138,6 +143,18 @@ class MeshPhysicalMaterial extends MeshStandardMaterial {
 		this.clearcoatNormalMap = null;
 
 		/**
+		 * The red channel of this texture is multiplied against `diffuseRoughness`,
+		 * for per-pixel control over the diffuse roughness.
+		 *
+		 * `diffuseRoughnessMap` represents non-color data. Any texture assigned must have
+		 * `texture.colorSpace = NoColorSpace` (default).
+		 *
+		 * @type {?Texture}
+		 * @default null
+		 */
+		this.diffuseRoughnessMap = null;
+
+		/**
 		 * Index-of-refraction for non-metallic materials, from `1.0` to `2.333`.
 		 *
 		 * @type {number}
@@ -191,20 +208,29 @@ class MeshPhysicalMaterial extends MeshStandardMaterial {
 		this.iridescenceIOR = 1.3;
 
 		/**
-		 *Array of exactly 2 elements, specifying minimum and maximum thickness of the iridescence layer.
-		 Thickness of iridescence layer has an equivalent effect of the one `thickness` has on `ior`.
+		 * The minimum thickness of the iridescence layer in nanometers.
 		 *
-		 * @type {Array<number,number>}
-		 * @default [100,400]
+		 * @type {number}
+		 * @default 100
 		 */
-		this.iridescenceThicknessRange = [ 100, 400 ];
+		this.iridescenceThicknessMinimum = 100;
+
+		/**
+		 * The maximum thickness of the iridescence layer in nanometers. If no
+		 * `iridescenceThicknessMap` is defined, this value is used as the thickness.
+		 *
+		 * @type {number}
+		 * @default 400
+		 */
+		this.iridescenceThicknessMaximum = 400;
 
 		/**
 		 * A texture that defines the thickness of the iridescence layer, stored in the green channel.
-		 * Minimum and maximum values of thickness are defined by `iridescenceThicknessRange` array:
-		 * - `0.0` in the green channel will result in thickness equal to first element of the array.
-		 * - `1.0` in the green channel will result in thickness equal to second element of the array.
-		 * - Values in-between will linearly interpolate between the elements of the array.
+		 * Minimum and maximum values of thickness are defined by `iridescenceThicknessMinimum` and
+		 * `iridescenceThicknessMaximum`:
+		 * - `0.0` in the green channel will result in thickness equal to `iridescenceThicknessMinimum`.
+		 * - `1.0` in the green channel will result in thickness equal to `iridescenceThicknessMaximum`.
+		 * - Values in-between will linearly interpolate between both values.
 		 *
 		 * `iridescenceThicknessMap` represents non-color data. Any texture assigned must have
 		 * `texture.colorSpace = NoColorSpace` (default).
@@ -352,8 +378,10 @@ class MeshPhysicalMaterial extends MeshStandardMaterial {
 
 		this._anisotropy = 0;
 		this._clearcoat = 0;
+		this._diffuseRoughness = 0;
 		this._dispersion = 0;
 		this._iridescence = 0;
+		this._retroreflectivity = 0;
 		this._sheen = 0.0;
 		this._transmission = 0;
 
@@ -410,6 +438,33 @@ class MeshPhysicalMaterial extends MeshStandardMaterial {
 		this._clearcoat = value;
 
 	}
+
+	/**
+	 * Roughness of the diffuse layer, from `0.0` to `1.0`. A value of `0.0`
+	 * uses Lambertian diffuse reflection. Values above `0.0` use the EON
+	 * energy-preserving rough diffuse model.
+	 *
+	 * @type {number}
+	 * @default 0
+	 */
+	get diffuseRoughness() {
+
+		return this._diffuseRoughness;
+
+	}
+
+	set diffuseRoughness( value ) {
+
+		if ( this._diffuseRoughness > 0 !== value > 0 ) {
+
+			this.version ++;
+
+		}
+
+		this._diffuseRoughness = value;
+
+	}
+
 	/**
 	 * The intensity of the iridescence layer, simulating RGB color shift based on the angle between
 	 * the surface and the viewer, from `0.0` to `1.0`.
@@ -458,6 +513,33 @@ class MeshPhysicalMaterial extends MeshStandardMaterial {
 		}
 
 		this._dispersion = value;
+
+	}
+
+	/**
+	 * The strength of retroreflection, from `0.0` to `1.0`. A value of `1.0`
+	 * evaluates the material's microfacet reflection with the view direction
+	 * reflected about the surface normal, redirecting the specular lobe back
+	 * toward the light source.
+	 *
+	 * @type {number}
+	 * @default 0
+	 */
+	get retroreflectivity() {
+
+		return this._retroreflectivity;
+
+	}
+
+	set retroreflectivity( value ) {
+
+		if ( this._retroreflectivity > 0 !== value > 0 ) {
+
+			this.version ++;
+
+		}
+
+		this._retroreflectivity = value;
 
 	}
 
@@ -515,6 +597,30 @@ class MeshPhysicalMaterial extends MeshStandardMaterial {
 
 	}
 
+	/**
+	 * Array of exactly 2 elements, specifying minimum and maximum thickness of the iridescence layer.
+	 *
+	 * @deprecated since r187. Use {@link MeshPhysicalMaterial#iridescenceThicknessMinimum} and {@link MeshPhysicalMaterial#iridescenceThicknessMaximum} instead.
+	 * @type {Array<number,number>}
+	 * @default [100,400]
+	 */
+	get iridescenceThicknessRange() {
+
+		warnOnce( 'MeshPhysicalMaterial: The "iridescenceThicknessRange" property has been replaced by "iridescenceThicknessMinimum" and "iridescenceThicknessMaximum".' ); // @deprecated r187
+
+		return [ this.iridescenceThicknessMinimum, this.iridescenceThicknessMaximum ];
+
+	}
+
+	set iridescenceThicknessRange( value ) {
+
+		warnOnce( 'MeshPhysicalMaterial: The "iridescenceThicknessRange" property has been replaced by "iridescenceThicknessMinimum" and "iridescenceThicknessMaximum".' ); // @deprecated r187
+
+		this.iridescenceThicknessMinimum = value[ 0 ];
+		this.iridescenceThicknessMaximum = value[ 1 ];
+
+	}
+
 	copy( source ) {
 
 		super.copy( source );
@@ -536,6 +642,8 @@ class MeshPhysicalMaterial extends MeshStandardMaterial {
 		this.clearcoatRoughnessMap = source.clearcoatRoughnessMap;
 		this.clearcoatNormalMap = source.clearcoatNormalMap;
 		this.clearcoatNormalScale.copy( source.clearcoatNormalScale );
+		this.diffuseRoughness = source.diffuseRoughness;
+		this.diffuseRoughnessMap = source.diffuseRoughnessMap;
 
 		this.dispersion = source.dispersion;
 		this.ior = source.ior;
@@ -543,8 +651,11 @@ class MeshPhysicalMaterial extends MeshStandardMaterial {
 		this.iridescence = source.iridescence;
 		this.iridescenceMap = source.iridescenceMap;
 		this.iridescenceIOR = source.iridescenceIOR;
-		this.iridescenceThicknessRange = [ ...source.iridescenceThicknessRange ];
+		this.iridescenceThicknessMinimum = source.iridescenceThicknessMinimum;
+		this.iridescenceThicknessMaximum = source.iridescenceThicknessMaximum;
 		this.iridescenceThicknessMap = source.iridescenceThicknessMap;
+
+		this.retroreflectivity = source.retroreflectivity;
 
 		this.sheen = source.sheen;
 		this.sheenColor.copy( source.sheenColor );

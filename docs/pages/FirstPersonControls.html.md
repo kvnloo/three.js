@@ -6,7 +6,7 @@ This class is an alternative implementation of [FlyControls](FlyControls.html).
 
 ## Import
 
-FirstPersonControls is an addon, and must be imported explicitly, see [Installation#Addons](https://threejs.org/manual/#en/installation).
+FirstPersonControls is an addon, and must be imported explicitly, see [Installation#Addons](https://threejs.org/manual/#installation#addons).
 
 ```js
 import { FirstPersonControls } from 'three/addons/controls/FirstPersonControls.js';
@@ -41,6 +41,12 @@ Default is `false`.
 Whether or not looking around is vertically constrained by `verticalMin` and `verticalMax`.
 
 Default is `false`.
+
+### .dampingFactor : number
+
+How quickly the movement and look velocity catches up to the input. Lower values feel heavier (more inertia), `1` disables damping.
+
+Default is `0.1`.
 
 ### .heightCoef : number
 
@@ -94,7 +100,7 @@ Default is `1`.
 
 How far you can vertically look around, upper limit. Range is `0` to `Math.PI` in radians.
 
-Default is `0`.
+Default is `Math.PI`.
 
 ### .verticalMin : number
 

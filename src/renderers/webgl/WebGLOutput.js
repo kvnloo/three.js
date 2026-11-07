@@ -8,7 +8,9 @@ import {
 	NeutralToneMapping,
 	CustomToneMapping,
 	SRGBTransfer,
-	HalfFloatType
+	HalfFloatType,
+	DepthStencilFormat,
+	UnsignedInt248Type
 } from '../../constants.js';
 import { BufferGeometry } from '../../core/BufferGeometry.js';
 import { Float32BufferAttribute } from '../../core/BufferAttribute.js';
@@ -31,20 +33,24 @@ const toneMappingMap = {
 
 function WebGLOutput( type, width, height, antialias, depth, stencil ) {
 
-	// render targets for scene and post-processing
-	const targetA = new WebGLRenderTarget( width, height, {
+	// render target for the scene pass (potentially multisampled)
+	const targetScene = new WebGLRenderTarget( width, height, {
 		type: type,
 		depthBuffer: depth,
 		stencilBuffer: stencil,
 		samples: antialias ? 4 : 0,
-		depthTexture: depth ? new DepthTexture( width, height ) : undefined
+		storeMultisampledDepthBuffer: false,
+		storeMultisampledStencilBuffer: false,
+		resolveDepthBuffer: false,
+		resolveStencilBuffer: false
 	} );
 
-	const targetB = new WebGLRenderTarget( width, height, {
-		type: HalfFloatType,
-		depthBuffer: false,
-		stencilBuffer: false
-	} );
+	// single-sampled ping-pong buffers for post-processing effects, allocated on demand
+	let targetA = null;
+	let targetB = null;
+
+	// scene depth for effects with needsDepthTexture set to true, allocated on demand
+	let depthTexture = null;
 
 	// create fullscreen triangle geometry
 	const geometry = new BufferGeometry();
@@ -121,8 +127,10 @@ function WebGLOutput( type, width, height, antialias, depth, stencil ) {
 
 	this.setSize = function ( width, height ) {
 
-		targetA.setSize( width, height );
-		targetB.setSize( width, height );
+		targetScene.setSize( width, height );
+
+		if ( targetA !== null ) targetA.setSize( width, height );
+		if ( targetB !== null ) targetB.setSize( width, height );
 
 		for ( let i = 0; i < _effects.length; i ++ ) {
 
@@ -138,13 +146,50 @@ function WebGLOutput( type, width, height, antialias, depth, stencil ) {
 		_effects = effects;
 		_hasRenderPass = _effects.length > 0 && _effects[ 0 ].isRenderPass === true;
 
-		const width = targetA.width;
-		const height = targetA.height;
+		const width = targetScene.width;
+		const height = targetScene.height;
+
+		if ( _effects.length > 0 && targetA === null ) {
+
+			targetA = new WebGLRenderTarget( width, height, { type: HalfFloatType, depthBuffer: false, stencilBuffer: false } );
+			targetB = new WebGLRenderTarget( width, height, { type: HalfFloatType, depthBuffer: false, stencilBuffer: false } );
+
+		}
+
+		// only store and resolve the scene depth if an effect reads it
+
+		const needsDepthTexture = depth === true && _effects.some( ( effect ) => effect.needsDepthTexture === true );
+
+		if ( needsDepthTexture !== ( targetScene.depthTexture !== null ) ) {
+
+			if ( needsDepthTexture === true && depthTexture === null ) {
+
+				depthTexture = new DepthTexture( width, height );
+
+				if ( stencil === true ) {
+
+					depthTexture.format = DepthStencilFormat;
+					depthTexture.type = UnsignedInt248Type;
+
+				}
+
+			}
+
+			// release GPU resources so the scene target is rebuilt with the new depth setup
+
+			targetScene.dispose();
+
+			targetScene.depthTexture = needsDepthTexture ? depthTexture : null;
+			targetScene.resolveDepthBuffer = needsDepthTexture;
+			targetScene.storeMultisampledDepthBuffer = needsDepthTexture;
+
+		}
 
 		for ( let i = 0; i < _effects.length; i ++ ) {
 
 			const effect = _effects[ i ];
 			if ( effect.setSize ) effect.setSize( width, height );
+			if ( needsDepthTexture && effect.needsDepthTexture === true && effect.setDepthTexture ) effect.setDepthTexture( depthTexture );
 
 		}
 
@@ -165,7 +210,7 @@ function WebGLOutput( type, width, height, antialias, depth, stencil ) {
 			const width = renderTarget.width;
 			const height = renderTarget.height;
 
-			if ( targetA.width !== width || targetA.height !== height ) {
+			if ( targetScene.width !== width || targetScene.height !== height ) {
 
 				this.setSize( width, height );
 
@@ -173,10 +218,10 @@ function WebGLOutput( type, width, height, antialias, depth, stencil ) {
 
 		}
 
-		// if first effect is a RenderPass, it will set its own render target
+		// if the first effect is a RenderPass, it renders the scene itself (see end())
 		if ( _hasRenderPass === false ) {
 
-			renderer.setRenderTarget( targetA );
+			renderer.setRenderTarget( targetScene );
 
 		}
 
@@ -201,9 +246,10 @@ function WebGLOutput( type, width, height, antialias, depth, stencil ) {
 
 		_isCompositing = true;
 
-		// run post-processing effects
-		let readBuffer = targetA;
-		let writeBuffer = targetB;
+		// run post-processing effects - the scene lives in the multisampled targetScene,
+		// effects ping-pong between the single-sampled targetA and targetB
+		let readBuffer = targetScene;
+		let writeBuffer = targetA;
 
 		for ( let i = 0; i < _effects.length; i ++ ) {
 
@@ -215,9 +261,9 @@ function WebGLOutput( type, width, height, antialias, depth, stencil ) {
 
 			if ( effect.needsSwap !== false ) {
 
-				const temp = readBuffer;
+				// keep targetScene out of the rotation so only the scene pass is multisampled
 				readBuffer = writeBuffer;
-				writeBuffer = temp;
+				writeBuffer = ( writeBuffer === targetA ) ? targetB : targetA;
 
 			}
 
@@ -258,9 +304,11 @@ function WebGLOutput( type, width, height, antialias, depth, stencil ) {
 
 	this.dispose = function () {
 
-		if ( targetA.depthTexture ) targetA.depthTexture.dispose();
-		targetA.dispose();
-		targetB.dispose();
+		targetScene.dispose();
+
+		if ( targetA !== null ) targetA.dispose();
+		if ( targetB !== null ) targetB.dispose();
+
 		geometry.dispose();
 		material.dispose();
 

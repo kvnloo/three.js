@@ -283,6 +283,14 @@ class SSSSNode extends TempNode {
 		 */
 		this._previousRenderObjectFunction = null;
 
+		/**
+		 * The SSSS-owned callback, used to restore only the hook we installed.
+		 *
+		 * @private
+		 * @type {?Function}
+		 */
+		this._renderObjectFunction = null;
+
 		// Per-material SSS registry.
 		this._sssSlots = [ null ]; // sparse array indexed by slot (slot 0 = dummy for non-SSS pixels).
 		this._materialSlots = new WeakMap(); // WeakMap(material → slot) for O(1) lookup and GC-friendly storage.
@@ -587,6 +595,44 @@ class SSSSNode extends TempNode {
 	}
 
 	/**
+	 * Assigns SSS slots on a visible object's first draw, while preserving any
+	 * render-object callback already installed by the application or another pass.
+	 *
+	 * @private
+	 * @param {Renderer} renderer - The renderer drawing the scene.
+	 */
+	_installRenderObjectHook( renderer ) {
+
+		if ( this._renderer !== null ) return;
+
+		const previousRenderObjectFunction = renderer.getRenderObjectFunction();
+
+		this._renderer = renderer;
+		this._previousRenderObjectFunction = previousRenderObjectFunction;
+
+		this._renderObjectFunction = ( object, scene, camera, geometry, material, group, lightsNode, clippingContext, passId ) => {
+
+			if ( this._renderer === renderer && material.isMeshSubsurfaceNodeMaterial === true && this._materialSlots.has( material ) === false ) {
+
+				this._registerSSS( material );
+
+			}
+
+			if ( previousRenderObjectFunction !== null ) {
+
+				return previousRenderObjectFunction.call( renderer, object, scene, camera, geometry, material, group, lightsNode, clippingContext, passId );
+
+			}
+
+			return renderer.renderObject( object, scene, camera, geometry, material, group, lightsNode, clippingContext, passId );
+
+		};
+
+		renderer.setRenderObjectFunction( this._renderObjectFunction );
+
+	}
+
+	/**
 	 * Installs the render-object hook (once) and builds the SSS blur pass shader.
 	 *
 	 * @param {NodeBuilder} builder - The current node builder.
@@ -594,30 +640,7 @@ class SSSSNode extends TempNode {
 	 */
 	setup( builder ) {
 
-		// Assign each subsurface material its SSS slot the first time it is drawn (after frustum
-		// culling) by intercepting the renderer's per-object draw. The scene pass writes the slot
-		// into `albedo.a` and runs before this pass, so the hook is installed once at setup and
-		// restored on dispose.
-		if ( this._renderer === null ) {
-
-			const renderer = builder.renderer;
-
-			this._renderer = renderer;
-			this._previousRenderObjectFunction = renderer.getRenderObjectFunction();
-
-			renderer.setRenderObjectFunction( ( object, scene, camera, geometry, material, group, lightsNode, clippingContext, passId ) => {
-
-				if ( material.isMeshSubsurfaceNodeMaterial === true && this._materialSlots.has( material ) === false ) {
-
-					this._registerSSS( material );
-
-				}
-
-				renderer.renderObject( object, scene, camera, geometry, material, group, lightsNode, clippingContext, passId );
-
-			} );
-
-		}
+		this._installRenderObjectHook( builder.renderer );
 
 		const { colorNode, depthNode, albedoNode, normalNode } = this;
 		const sssParams = this._sssParamsNode;
@@ -854,10 +877,21 @@ class SSSSNode extends TempNode {
 	 */
 	dispose() {
 
-		// Restore the render-object function that was installed before our hook.
+		// Do not clobber another pass that installed its hook after this effect.
 		if ( this._renderer !== null ) {
 
-			this._renderer.setRenderObjectFunction( this._previousRenderObjectFunction );
+			const renderer = this._renderer;
+
+			if ( renderer.getRenderObjectFunction() === this._renderObjectFunction ) {
+
+				renderer.setRenderObjectFunction( this._previousRenderObjectFunction );
+
+			}
+
+			// A later hook may still call ours; it must only forward, not register slots.
+			this._renderer = null;
+			this._renderObjectFunction = null;
+			this._previousRenderObjectFunction = null;
 
 		}
 

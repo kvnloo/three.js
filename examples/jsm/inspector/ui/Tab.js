@@ -62,11 +62,13 @@ export class Tab extends EventDispatcher {
 
 	get isActive() {
 
+		if ( this.isDetached && this.isVisible ) return true;
+
 		const isProfilerVisible = this.profiler && this.profiler.panel.classList.contains( 'visible' );
 
 		if ( ! isProfilerVisible ) return false;
 
-		return this.isDetached || this._isActive;
+		return this._isActive;
 
 	}
 
@@ -261,5 +263,7 @@ export class Tab extends EventDispatcher {
 		}
 
 	}
+
+	dispose() { }
 
 }

@@ -1,19 +1,21 @@
 
 import { normalLocal } from './Normal.js';
-import { positionLocal } from './Position.js';
+import { positionLocal, positionPrevious } from './Position.js';
 import { vec3, mat3, mat4, int, ivec2, float, Fn } from '../tsl/TSLBase.js';
 import { textureLoad } from './TextureNode.js';
 import { textureSize } from './TextureSizeNode.js';
 import { tangentLocal } from './Tangent.js';
 import { instanceIndex, drawIndex } from '../core/IndexNode.js';
 import { varyingProperty } from '../core/PropertyNode.js';
+import { OnObjectUpdate, OnAfterObjectUpdate } from '../utils/EventNode.js';
+import { DataTexture } from '../../textures/DataTexture.js';
 
 /**
  * TSL function that retrieves the batching color for a given instance ID from a colors texture.
  *
  * @param {Node<texture>} colorsTexture - The colors texture.
  * @param {Node<int>} id - The instance or batch ID.
- * @returns {Node<vec3>} The retrieved color.
+ * @returns {Node<vec4>} The retrieved color.
  */
 const getBatchingColor = /*@__PURE__*/ Fn( ( [ colorsTexture, id ] ) => {
 
@@ -21,7 +23,7 @@ const getBatchingColor = /*@__PURE__*/ Fn( ( [ colorsTexture, id ] ) => {
 	const j = int( id );
 	const x = j.mod( size ).toConst();
 	const y = j.div( size ).toConst();
-	return textureLoad( colorsTexture, ivec2( x, y ) ).rgb;
+	return textureLoad( colorsTexture, ivec2( x, y ) );
 
 } );
 
@@ -42,11 +44,68 @@ const getIndirectIndex = /*@__PURE__*/ Fn( ( [ indirectTexture, id ] ) => {
 } );
 
 /**
+ * Creates the node that reads a batching matrix from the given matrices texture.
+ *
+ * @param {Texture} matricesTexture - The matrices texture.
+ * @param {Node<uint>} id - The indirect instance ID.
+ * @returns {Node<mat4>} The matrix node.
+ */
+function createBatchingMatrixNode( matricesTexture, id ) {
+
+	const size = int( textureSize( textureLoad( matricesTexture ), 0 ).x ).toConst();
+	const j = float( id ).mul( 4 ).toInt().toConst();
+
+	const x = j.mod( size ).toConst();
+	const y = j.div( size ).toConst();
+
+	return mat4(
+		textureLoad( matricesTexture, ivec2( x, y ) ),
+		textureLoad( matricesTexture, ivec2( x.add( 1 ), y ) ),
+		textureLoad( matricesTexture, ivec2( x.add( 2 ), y ) ),
+		textureLoad( matricesTexture, ivec2( x.add( 3 ), y ) )
+	);
+
+}
+
+/**
+ * Returns the batching matrices texture of the previous frame for motion vectors.
+ * It is created on first use and again after the batched mesh released it.
+ *
+ * @param {BatchedMesh} batchMesh - The batched mesh.
+ * @returns {DataTexture} The previous frame matrices texture.
+ */
+function getPreviousMatricesTexture( batchMesh ) {
+
+	let previousMatricesTexture = batchMesh._previousMatricesTexture;
+
+	if ( previousMatricesTexture === null ) {
+
+		const { image, format, type, version } = batchMesh._matricesTexture;
+
+		previousMatricesTexture = new DataTexture( image.data.slice(), image.width, image.height, format, type );
+		previousMatricesTexture.version = version;
+
+		batchMesh._previousMatricesTexture = previousMatricesTexture;
+
+	}
+
+	return previousMatricesTexture;
+
+}
+
+/**
  * TSL object representing a varying property for the batching color vector.
  *
- * @type {VaryingNode<vec3>}
+ * @type {VaryingNode<vec4>}
  */
-export const batchColor = /*@__PURE__*/ varyingProperty( 'vec3', 'vBatchColor' );
+export const batchColor = /*@__PURE__*/ varyingProperty( 'vec4', 'vBatchColor' );
+
+/**
+ * TSL object representing a varying property for the batch indirect index (instance ID).
+ *
+ * @type {VaryingNode<uint>}
+ */
+export const batchIndirectIndex = /*@__PURE__*/ varyingProperty( 'uint', 'vBatchIndirectId' );
 
 /**
  * TSL function representing the vertex shader batching setup.
@@ -63,19 +122,9 @@ export const batch = /*@__PURE__*/ Fn( ( [ batchMesh ], builder ) => {
 
 	const indirectId = getIndirectIndex( batchMesh._indirectTexture, int( batchingIdNode ) );
 
-	const matricesTexture = batchMesh._matricesTexture;
+	batchIndirectIndex.assign( indirectId );
 
-	const size = int( textureSize( textureLoad( matricesTexture ), 0 ).x ).toConst();
-	const j = float( indirectId ).mul( 4 ).toInt().toConst();
-
-	const x = j.mod( size ).toConst();
-	const y = j.div( size ).toConst();
-	const batchingMatrix = mat4(
-		textureLoad( matricesTexture, ivec2( x, y ) ),
-		textureLoad( matricesTexture, ivec2( x.add( 1 ), y ) ),
-		textureLoad( matricesTexture, ivec2( x.add( 2 ), y ) ),
-		textureLoad( matricesTexture, ivec2( x.add( 3 ), y ) )
-	);
+	const batchingMatrix = createBatchingMatrixNode( batchMesh._matricesTexture, indirectId );
 
 	const colorsTexture = batchMesh._colorsTexture;
 
@@ -91,6 +140,27 @@ export const batch = /*@__PURE__*/ Fn( ( [ batchMesh ], builder ) => {
 
 	positionLocal.assign( batchingMatrix.mul( positionLocal ) );
 
+	if ( builder.needsPreviousData() ) {
+
+		OnAfterObjectUpdate( ( { object } ) => {
+
+			const previousMatricesTexture = getPreviousMatricesTexture( object );
+			const matricesTexture = object._matricesTexture;
+
+			if ( previousMatricesTexture.version !== matricesTexture.version ) {
+
+				previousMatricesTexture.image.data.set( matricesTexture.image.data );
+				previousMatricesTexture.version = matricesTexture.version;
+
+			}
+
+		} );
+
+		const previousBatchingMatrixNode = createBatchingMatrixNode( getPreviousMatricesTexture( batchMesh ), indirectId );
+		positionPrevious.assign( previousBatchingMatrixNode.mul( positionPrevious ).xyz );
+
+	}
+
 	const transformedNormal = normalLocal.div( vec3( bm[ 0 ].dot( bm[ 0 ] ), bm[ 1 ].dot( bm[ 1 ] ), bm[ 2 ].dot( bm[ 2 ] ) ) );
 
 	const batchingNormal = bm.mul( transformedNormal ).xyz;
@@ -102,6 +172,14 @@ export const batch = /*@__PURE__*/ Fn( ( [ batchMesh ], builder ) => {
 		tangentLocal.mulAssign( bm );
 
 	}
+
+	const drawFormat = builder.renderer.backend.isWebGPUBackend === true ? 'merged' : 'multiDraw';
+
+	OnObjectUpdate( ( { object, camera, material } ) => {
+
+		object._updateDrawParameters( camera, object.geometry, material, drawFormat );
+
+	} );
 
 }, 'void' );
 

@@ -38,7 +38,7 @@
 		<script type="module">
 
 			import * as THREE from 'three/webgpu';
-			import { Fn, add, attributeArray, color, instanceIndex, screenUV, storage, transformNormal, transformNormalToView, uint, uniform, vec4, vertexIndex } from 'three/tsl';
+			import { Fn, add, attributeArray, color, instanceIndex, screenUV, storage, transformNormal, transformNormalToView, uint, uniform, vec4, vertexIndex, mat3 } from 'three/tsl';
 
 			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 			import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -109,7 +109,7 @@
 						skeleton,
 						boneCount,
 						boneMatrices,
-						boneMatricesNode: storage( boneMatrices, 'mat4', boneMatrices.count ).toReadOnly()
+						boneMatricesNode: storage( boneMatrices, 'mat4' ).toReadOnly()
 					};
 
 					skeletonStates.set( skeleton, state );
@@ -127,9 +127,9 @@
 				const vertexCount = geometry.getAttribute( 'position' ).count;
 				const skeletonState = getSkeletonState( source.skeleton, instanceCount );
 
-				const sourceVertices = storage( createSourceVertexAttribute( geometry ), 'vec4', vertexCount * 3 ).toReadOnly();
-				const skinIndices = storage( new THREE.StorageBufferAttribute( new Uint32Array( geometry.getAttribute( 'skinIndex' ).array ), 4 ), 'uvec4', vertexCount ).toReadOnly();
-				const skinWeights = storage( new THREE.StorageBufferAttribute( geometry.getAttribute( 'skinWeight' ).array, 4 ), 'vec4', vertexCount ).toReadOnly();
+				const sourceVertices = storage( createSourceVertexAttribute( geometry ), 'vec4' ).toReadOnly();
+				const skinIndices = storage( new THREE.StorageBufferAttribute( new Uint32Array( geometry.getAttribute( 'skinIndex' ).array ), 4 ), 'uvec4' ).toReadOnly();
+				const skinWeights = storage( new THREE.StorageBufferAttribute( geometry.getAttribute( 'skinWeight' ).array, 4 ), 'vec4' ).toReadOnly();
 				const bindMatrix = uniform( source.bindMatrix, 'mat4' );
 				const bindMatrixInverse = uniform( source.bindMatrixInverse, 'mat4' );
 				const vertices = attributeArray( instanceCount * vertexCount * 2, 'vec4' );
@@ -161,7 +161,9 @@
 						boneMatZ.mul( skinWeight.z ).mul( skinVertex ),
 						boneMatW.mul( skinWeight.w ).mul( skinVertex )
 					) ).xyz;
-					const skinNormal = bindMatrixInverse.mul( skinMatrix ).mul( bindMatrix ).transformDirection( sourceVertices.element( sourceOffset.add( uint( 1 ) ) ).xyz ).xyz;
+
+					const skinMatrix3 = mat3( bindMatrixInverse.mul( skinMatrix ).mul( bindMatrix ) );
+					const skinNormal = skinMatrix3.mul( sourceVertices.element( sourceOffset.add( uint( 1 ) ) ).xyz );
 					const instanceMatrix = instanceMatricesNode.element( meshInstance );
 
 					vertices.element( targetOffset ).assign( vec4( instanceMatrix.mul( skinPosition ).xyz, 1 ) );
@@ -280,8 +282,8 @@
 
 					const bellyWeights = new THREE.StorageBufferAttribute( instanceCount, 1 );
 					instanceMatrices = new THREE.StorageBufferAttribute( instanceCount, 16 );
-					bellyWeightsNode = storage( bellyWeights, 'float', instanceCount ).toReadOnly();
-					instanceMatricesNode = storage( instanceMatrices, 'mat4', instanceCount ).toReadOnly();
+					bellyWeightsNode = storage( bellyWeights, 'float' ).toReadOnly();
+					instanceMatricesNode = storage( instanceMatrices, 'mat4' ).toReadOnly();
 
 					for ( let i = 0; i < instanceCount; i ++ ) {
 
@@ -321,7 +323,6 @@
 				renderer.setSize( window.innerWidth, window.innerHeight );
 				renderer.setAnimationLoop( animate );
 				renderer.shadowMap.enabled = true;
-				renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 				renderer.toneMapping = THREE.NeutralToneMapping;
 				renderer.toneMappingExposure = 0.96;
 				renderer.inspector = new Inspector();

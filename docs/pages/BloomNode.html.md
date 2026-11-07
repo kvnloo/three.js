@@ -1,4 +1,4 @@
-*Inheritance: EventDispatcher → Node → TempNode →*
+*Inheritance: EventDispatcher → Node →*
 
 # BloomNode
 
@@ -29,7 +29,7 @@ renderPipeline.outputNode = scenePassColor.add( bloomPass );
 
 ## Import
 
-BloomNode is an addon, and must be imported explicitly, see [Installation#Addons](https://threejs.org/manual/#en/installation).
+BloomNode is an addon, and must be imported explicitly, see [Installation#Addons](https://threejs.org/manual/#installation#addons).
 
 ```js
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
@@ -65,6 +65,14 @@ Default is `0`.
 
 ## Properties
 
+### .bloomTintColors : Array.<Vector3>
+
+A per-mip tint color for the bloom, applied during the composite pass. Defaults to white (no tint) for each of the mips. Mutate the vectors to colorize the bloom (e.g. for a warm or anamorphic look).
+
+### .highPassFn : function
+
+Can be used to inject a custom high pass filter (e.g., for anamorphic effects).
+
 ### .inputNode : Node.<vec4>
 
 The node that represents the input of the effect.
@@ -91,7 +99,7 @@ The `updateBeforeType` is set to `NodeUpdateType.FRAME` since the node renders i
 
 Default is `'frame'`.
 
-**Overrides:** [TempNode#updateBeforeType](TempNode.html#updateBeforeType)
+**Overrides:** [Node#updateBeforeType](Node.html#updateBeforeType)
 
 ## Methods
 
@@ -99,13 +107,29 @@ Default is `'frame'`.
 
 Frees internal resources. This method should be called when the effect is no longer required.
 
-**Overrides:** [TempNode#dispose](TempNode.html#dispose)
+**Overrides:** [Node#dispose](Node.html#dispose)
+
+### .getResolutionScale() : number
+
+Gets the current resolution scale of the pass.
+
+**Returns:** The current resolution scale. A value of `1` means full resolution.
 
 ### .getTextureNode() : PassTextureNode
 
 Returns the result of the effect as a texture node.
 
 **Returns:** A texture node that represents the result of the effect.
+
+### .setResolutionScale( resolutionScale : number ) : BloomNode
+
+Sets the resolution scale for the pass. The resolution scale is a factor that is multiplied with the renderer's width and height.
+
+**resolutionScale**
+
+The resolution scale to set. A value of `1` means full resolution.
+
+**Returns:** A reference to this node.
 
 ### .setSize( width : number, height : number )
 
@@ -127,7 +151,7 @@ This method is used to setup the effect's TSL code.
 
 The current node builder.
 
-**Overrides:** [TempNode#setup](TempNode.html#setup)
+**Overrides:** [Node#setup](Node.html#setup)
 
 ### .updateBefore( frame : NodeFrame )
 
@@ -137,7 +161,7 @@ This method is used to render the effect once per frame.
 
 The current node frame.
 
-**Overrides:** [TempNode#updateBefore](TempNode.html#updateBefore)
+**Overrides:** [Node#updateBefore](Node.html#updateBefore)
 
 ## Source
 

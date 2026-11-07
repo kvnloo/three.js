@@ -3,6 +3,10 @@ import SSSSNode from '../../../../../examples/jsm/tsl/display/SSSSNode.js';
 import { PerspectiveCamera } from '../../../../../src/cameras/PerspectiveCamera.js';
 import { Texture } from '../../../../../src/textures/Texture.js';
 import { texture } from 'three/tsl';
+import { WebGPURenderer } from 'three/webgpu';
+import { BufferGeometry } from '../../../../../src/core/BufferGeometry.js';
+import { Mesh } from '../../../../../src/objects/Mesh.js';
+import { Scene } from '../../../../../src/scenes/Scene.js';
 
 function createSSSS() {
 
@@ -109,6 +113,83 @@ export default QUnit.module( 'Materials', () => {
 			assert.strictEqual( clone.subsurfaceSlotNode.value, 2 );
 
 			effect.dispose();
+
+		} );
+
+		QUnit.test( 'render-object hook composes the prior callback and restores it', ( assert ) => {
+
+			const renderer = new WebGPURenderer();
+			const calls = [];
+			const previousHook = function ( ...args ) {
+
+				calls.push( { context: this, args } );
+				return 23;
+
+			};
+
+			renderer.setRenderObjectFunction( previousHook );
+
+			const effect = createSSSS();
+			effect._installRenderObjectHook( renderer );
+			const installedHook = renderer.getRenderObjectFunction();
+			effect._installRenderObjectHook( renderer );
+
+			assert.strictEqual( renderer.getRenderObjectFunction(), installedHook, 'reinstall is idempotent' );
+
+			const material = new MeshSubsurfaceNodeMaterial();
+			const geometry = new BufferGeometry();
+			const drawArgs = [ new Mesh( geometry, material ), new Scene(), new PerspectiveCamera(), geometry, material, null, null, null, 7 ];
+
+			assert.strictEqual( installedHook( ...drawArgs ), 23, 'the previous callback return value is preserved' );
+			installedHook( ...drawArgs );
+
+			assert.strictEqual( calls.length, 2, 'previous callback runs once for each draw' );
+			assert.strictEqual( calls[ 0 ].context, renderer, 'previous callback uses the renderer context' );
+			assert.strictEqual( calls[ 0 ].args.length, drawArgs.length, 'all render arguments are forwarded' );
+
+			for ( let i = 0; i < drawArgs.length; i ++ ) {
+
+				assert.strictEqual( calls[ 0 ].args[ i ], drawArgs[ i ], 'argument ' + i + ' is forwarded unchanged' );
+
+			}
+
+			assert.strictEqual( material.subsurfaceSlotNode.value, 1, 'visible SSS material gets slot 1' );
+			assert.strictEqual( effect._sssSlots.length, 2, 'second draw does not allocate twice' );
+
+			effect.dispose();
+			assert.strictEqual( renderer.getRenderObjectFunction(), previousHook, 'the previous callback is restored' );
+
+			material.dispose();
+			geometry.dispose();
+
+		} );
+
+		QUnit.test( 'disposing SSSS preserves a newer render-object callback', ( assert ) => {
+
+			const renderer = new WebGPURenderer();
+			let previousCalls = 0;
+			const previousHook = () => previousCalls ++;
+			renderer.setRenderObjectFunction( previousHook );
+
+			const effect = createSSSS();
+			effect._installRenderObjectHook( renderer );
+
+			const installedHook = renderer.getRenderObjectFunction();
+			const laterHook = ( ...args ) => installedHook( ...args );
+			renderer.setRenderObjectFunction( laterHook );
+
+			effect.dispose();
+			assert.strictEqual( renderer.getRenderObjectFunction(), laterHook, 'the newer callback stays installed' );
+
+			const material = new MeshSubsurfaceNodeMaterial();
+			const geometry = new BufferGeometry();
+			laterHook( new Mesh( geometry, material ), new Scene(), new PerspectiveCamera(), geometry, material, null, null, null, 11 );
+
+			assert.strictEqual( previousCalls, 1, 'later hook can still delegate to the original callback' );
+			assert.strictEqual( material.subsurfaceSlotNode.value, 0, 'disposed effect no longer registers materials' );
+
+			material.dispose();
+			geometry.dispose();
 
 		} );
 

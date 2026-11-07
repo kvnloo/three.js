@@ -1,4 +1,4 @@
-*Inheritance: EventDispatcher → Node → TempNode →*
+*Inheritance: EventDispatcher → Node →*
 
 # SSGINode
 
@@ -28,7 +28,7 @@ Without temporal filtering:
 
 ## Import
 
-SSGINode is an addon, and must be imported explicitly, see [Installation#Addons](https://threejs.org/manual/#en/installation).
+SSGINode is an addon, and must be imported explicitly, see [Installation#Addons](https://threejs.org/manual/#installation#addons).
 
 ```js
 import { ssgi } from 'three/addons/tsl/display/SSGINode.js';
@@ -100,6 +100,12 @@ Effective sampling radius in world space. AO and GI can only have influence with
 
 Default is `12`.
 
+### .resolutionScale : number
+
+The resolution scale. Values towards `0.5` noticeably increase noise, so it's recommended to lower the renderer's pixel ratio first. Use this property only for fine-tuning performance.
+
+Default is `1`.
+
 ### .sliceCount : UniformNode.<uint>
 
 Number of per-pixel hemisphere slices. This has a big performance cost and should be kept as low as possible. Should be in the range `[1, 4]`.
@@ -124,7 +130,7 @@ The `updateBeforeType` is set to `NodeUpdateType.FRAME` since the node renders i
 
 Default is `'frame'`.
 
-**Overrides:** [TempNode#updateBeforeType](TempNode.html#updateBeforeType)
+**Overrides:** [Node#updateBeforeType](Node.html#updateBeforeType)
 
 ### .useLinearThickness : UniformNode.<bool>
 
@@ -136,7 +142,7 @@ Default is `false`.
 
 Makes the sample distance in screen space instead of world-space (helps having more detail up close).
 
-Default is `false`.
+Default is `true`.
 
 ### .useTemporalFiltering : boolean
 
@@ -152,13 +158,19 @@ Default is `true`.
 
 Frees internal resources. This method should be called when the effect is no longer required.
 
-**Overrides:** [TempNode#dispose](TempNode.html#dispose)
+**Overrides:** [Node#dispose](Node.html#dispose)
 
-### .getTextureNode() : PassTextureNode
+### .getAONode() : PassTextureNode
 
-Returns the result of the effect as a texture node.
+Returns the AO result of the effect as a texture node.
 
-**Returns:** A texture node that represents the result of the effect.
+**Returns:** A texture node that represents the AO result of the effect.
+
+### .getGINode() : PassTextureNode
+
+Returns the GI result of the effect as a texture node.
+
+**Returns:** A texture node that represents the GI result of the effect.
 
 ### .setSize( width : number, height : number )
 
@@ -180,7 +192,7 @@ This method is used to setup the effect's TSL code.
 
 The current node builder.
 
-**Overrides:** [TempNode#setup](TempNode.html#setup)
+**Overrides:** [Node#setup](Node.html#setup)
 
 ### .updateBefore( frame : NodeFrame )
 
@@ -190,7 +202,7 @@ This method is used to render the effect once per frame.
 
 The current node frame.
 
-**Overrides:** [TempNode#updateBefore](TempNode.html#updateBefore)
+**Overrides:** [Node#updateBefore](Node.html#updateBefore)
 
 ## Source
 

@@ -46,6 +46,14 @@ Overwrites the default [Node#customCacheKey](Node.html#customCacheKey) implement
 
 **Returns:** The custom cache key.
 
+### .getBuiltinLights() : Array.<Light>
+
+Returns an array of the scene's lights.
+
+The light variations are shader-dependent; if this array changes, the shader needs to be recreated.
+
+**Returns:** The scene's lights.
+
 ### .getHash( builder : NodeBuilder ) : string
 
 Computes a hash value for identifying the current light nodes setup.
@@ -102,6 +110,22 @@ The light node.
 
 The light object containing color and direction properties.
 
+### .setupDirectRectAreaLight( builder : Object, lightNode : Object, lightData : Object )
+
+Sets up a direct rect area light in the lighting model.
+
+**builder**
+
+The builder object containing the context and stack.
+
+**lightNode**
+
+The light node.
+
+**lightData**
+
+The light object containing color and area light properties.
+
 ### .setupLights( builder : NodeBuilder, lightNodes : Array.<LightingNode> )
 
 Setups the internal lights by building all respective light nodes.
@@ -114,13 +138,15 @@ A reference to the current node builder.
 
 An array of lighting nodes.
 
-### .setupLightsNode( builder : NodeBuilder )
+### .setupLightsNode( builder : NodeBuilder ) : Array.<LightingNode>
 
 Creates lighting nodes for each scene light. This makes it possible to further process lights in the node system.
 
 **builder**
 
 A reference to the current node builder.
+
+**Returns:** The array of lighting nodes.
 
 ## Source
 

@@ -10,16 +10,20 @@ class Value extends EventDispatcher {
 		this.domElement.className = 'param-control';
 
 		this._onChangeFunction = null;
+		this._changeTimeout = null;
+		this._debounceTime = 0;
 
 		this.addEventListener( 'change', ( e ) => {
 
 			// defer to avoid issues when changing multiple values in the same call stack
 
-			requestAnimationFrame( () => {
+			clearTimeout( this._changeTimeout );
+
+			this._changeTimeout = setTimeout( () => {
 
 				if ( this._onChangeFunction ) this._onChangeFunction( e.value );
 
-			} );
+			}, this._debounceTime );
 
 		} );
 
@@ -48,6 +52,30 @@ class Value extends EventDispatcher {
 	onChange( callback ) {
 
 		this._onChangeFunction = callback;
+
+		return this;
+
+	}
+
+	debounce( time ) {
+
+		this._debounceTime = time;
+
+		return this;
+
+	}
+
+	show() {
+
+		this.dispatchEvent( { type: 'show' } );
+
+		return this;
+
+	}
+
+	hide() {
+
+		this.dispatchEvent( { type: 'hide' } );
 
 		return this;
 
@@ -99,21 +127,44 @@ class ValueNumber extends Value {
 
 	addDragHandler() {
 
+		const threshold = 2;
+
+		let isPressed = false;
 		let isDragging = false;
-		let startY, startValue;
+		let startX, startY, startValue;
 
 		this.input.style.touchAction = 'none';
 
 		this.input.addEventListener( 'pointerdown', ( e ) => {
 
-			isDragging = true;
+			isPressed = true;
+			startX = e.clientX;
 			startY = e.clientY;
 			startValue = parseFloat( this.input.value );
-			document.body.style.cursor = 'ns-resize';
 
 		} );
 
 		document.addEventListener( 'pointermove', ( e ) => {
+
+			if ( isPressed ) {
+
+				// start dragging only after a vertical movement, a horizontal one selects text
+
+				if ( Math.abs( e.clientY - startY ) > threshold ) {
+
+					isPressed = false;
+					isDragging = true;
+					startY = e.clientY;
+					this.input.blur();
+					document.body.style.cursor = 'ns-resize';
+
+				} else if ( Math.abs( e.clientX - startX ) > threshold ) {
+
+					isPressed = false;
+
+				}
+
+			}
 
 			if ( isDragging ) {
 
@@ -147,6 +198,8 @@ class ValueNumber extends Value {
 		} );
 
 		document.addEventListener( 'pointerup', () => {
+
+			isPressed = false;
 
 			if ( isDragging ) {
 
@@ -333,6 +386,32 @@ class ValueSelect extends Value {
 
 	}
 
+	setValue( val ) {
+
+		if ( Array.isArray( this.options ) ) {
+
+			this.select.value = val;
+
+		} else {
+
+			const entry = Object.entries( this.options ).find( ( [ , v ] ) => v === val );
+
+			if ( entry ) {
+
+				this.select.value = entry[ 0 ];
+
+			} else {
+
+				this.select.value = val;
+
+			}
+
+		}
+
+		return super.setValue( val );
+
+	}
+
 	getValue() {
 
 		const options = this.options;
@@ -386,9 +465,29 @@ class ValueColor extends Value {
 
 	}
 
+	setValue( val ) {
+
+		const colorHex = this._getColorHex( val );
+
+		this.colorInput.value = colorHex;
+
+		if ( this._value && this._value.isColor ) {
+
+			this._value.setHex( parseInt( colorHex.slice( 1 ), 16 ) );
+
+		} else {
+
+			this._value = val;
+
+		}
+
+		return super.setValue( val );
+
+	}
+
 	_getColorHex( color ) {
 
-		if ( color.isColor ) {
+		if ( color && color.isColor ) {
 
 			color = color.getHex();
 
@@ -396,9 +495,9 @@ class ValueColor extends Value {
 
 		if ( typeof color === 'number' ) {
 
-			color = `#${ color.toString( 16 ) }`;
+			color = '#' + color.toString( 16 ).padStart( 6, '0' );
 
-		} else if ( color[ 0 ] !== '#' ) {
+		} else if ( typeof color === 'string' && color[ 0 ] !== '#' ) {
 
 			color = '#' + color;
 

@@ -1,8 +1,12 @@
 import { Parameters } from './Parameters.js';
 import { WebGPURenderer, WebGLBackend, Node } from 'three/webgpu';
-import { getItem, setItem } from '../Inspector.js';
+import { getItem, setItem } from '../Storage.js';
 
 const _extensions = [
+	{
+		name: 'Color Grading',
+		url: '../extensions/color-grading/ColorGrading.js'
+	},
 	{
 		name: 'TSL Graph',
 		url: '../extensions/tsl-graph/TSLGraphEditor.js'
@@ -114,6 +118,16 @@ class Settings extends Parameters {
 			location.reload();
 
 		} );
+
+		// Render Modes
+
+		const modesGroup = this.createGroup( 'Render Modes' );
+
+		modesGroup.add( { overdraw: false }, 'overdraw' ).name( 'Overdraw' ).onChange( ( enable ) => {
+
+			this.inspector.overdraw = enable;
+
+		} ).info( 'Shows how many times each pixel is shaded.' );
 
 	}
 

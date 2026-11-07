@@ -1,4 +1,4 @@
-*Inheritance: EventDispatcher → Node → TempNode →*
+*Inheritance: EventDispatcher → Node →*
 
 # SSSNode
 
@@ -10,7 +10,7 @@ The shadows produced by this implementation might have too hard edges for certai
 
 Limitations:
 
-*   Ideally the maximum shadow length should not exceed `1` meter. Otherwise the effect gets computationally very expensive since more samples during the ray marching process are evaluated. You can mitigate this issue by reducing the `quality` paramter.
+*   Ideally the maximum shadow length should not exceed `1` meter. Otherwise the effect gets computationally very expensive since more samples during the ray marching process are evaluated. You can mitigate this issue by reducing the `quality` parameter.
 *   The effect can only be used with a single directional light, the main light of your scene. This main light usually represents the sun or daylight.
 *   Like other Screen-Space techniques SSS can only honor objects in the shadowing computation that are currently visible within the camera's view.
 
@@ -28,7 +28,7 @@ const sssBlur = boxBlur( sssPass.r, { size: 2, separation: 1 } ); // optional bl
 
 ## Import
 
-SSSNode is an addon, and must be imported explicitly, see [Installation#Addons](https://threejs.org/manual/#en/installation).
+SSSNode is an addon, and must be imported explicitly, see [Installation#Addons](https://threejs.org/manual/#installation#addons).
 
 ```js
 import { sss } from 'three/addons/tsl/display/SSSNode.js';
@@ -96,11 +96,11 @@ The `updateBeforeType` is set to `NodeUpdateType.FRAME` since the node renders i
 
 Default is `'frame'`.
 
-**Overrides:** [TempNode#updateBeforeType](TempNode.html#updateBeforeType)
+**Overrides:** [Node#updateBeforeType](Node.html#updateBeforeType)
 
 ### .useTemporalFiltering : boolean
 
-Whether to use temporal filtering or not. Setting this property to `true` requires the usage of `TRAANode`. This will help to reduce noice although it introduces typical TAA artifacts like ghosting and temporal instabilities.
+Whether to use temporal filtering or not. Setting this property to `true` requires the usage of `TRAANode`. This will help to reduce noise although it introduces typical TAA artifacts like ghosting and temporal instabilities.
 
 Default is `false`.
 
@@ -110,7 +110,7 @@ Default is `false`.
 
 Frees internal resources. This method should be called when the effect is no longer required.
 
-**Overrides:** [TempNode#dispose](TempNode.html#dispose)
+**Overrides:** [Node#dispose](Node.html#dispose)
 
 ### .getTextureNode() : PassTextureNode
 
@@ -138,7 +138,7 @@ This method is used to setup the effect's TSL code.
 
 The current node builder.
 
-**Overrides:** [TempNode#setup](TempNode.html#setup)
+**Overrides:** [Node#setup](Node.html#setup)
 
 ### .updateBefore( frame : NodeFrame )
 
@@ -148,7 +148,7 @@ This method is used to render the effect once per frame.
 
 The current node frame.
 
-**Overrides:** [TempNode#updateBefore](TempNode.html#updateBefore)
+**Overrides:** [Node#updateBefore](Node.html#updateBefore)
 
 ## Source
 

@@ -9,9 +9,9 @@ class ParametersGroup {
 	constructor( parameters, name ) {
 
 		this.parameters = parameters;
-		this.name = name;
 
 		this.paramList = new Item( name );
+		this.paramList.setCollapsible( true );
 
 		this.objects = [];
 
@@ -20,6 +20,30 @@ class ParametersGroup {
 	close() {
 
 		this.paramList.close();
+
+		return this;
+
+	}
+
+	name( name ) {
+
+		this.paramList.setValue( 0, name );
+
+		return this;
+
+	}
+
+	show() {
+
+		this.paramList.show();
+
+		return this;
+
+	}
+
+	hide() {
+
+		this.paramList.hide();
 
 		return this;
 
@@ -79,7 +103,11 @@ class ParametersGroup {
 
 	_addParameter( object, property, editor, subItem ) {
 
+		subItem.data[ 0 ].title = property;
+
 		editor.name = ( name ) => {
+
+			subItem.data[ 0 ].title = name;
 
 			if ( subItem.data[ 0 ].childNodes.length > 0 && subItem.data[ 0 ].firstChild.nodeType === 3 /* Node.TEXT_NODE */ ) {
 
@@ -128,6 +156,9 @@ class ParametersGroup {
 	_registerParameter( object, property, editor, subItem ) {
 
 		this.objects.push( { object: object, key: property, editor: editor, subItem: subItem } );
+
+		editor.addEventListener( 'show', () => subItem.show() );
+		editor.addEventListener( 'hide', () => subItem.hide() );
 
 	}
 
@@ -383,7 +414,7 @@ class Parameters extends Tab {
 
 		const paramList = new List( 'Property', 'Value' );
 		paramList.domElement.classList.add( 'parameters' );
-		paramList.setGridStyle( '.5fr 1fr' );
+		paramList.setGridStyle( 'minmax(0, .5fr) minmax(0, 1fr)' );
 		paramList.domElement.style.minWidth = '300px';
 
 		const scrollWrapper = document.createElement( 'div' );
