@@ -297,7 +297,7 @@ class Interpolant {
 	 */
 	interpolate_( /* i1, t0, t, t1 */ ) {
 
-		throw new Error( 'call to abstract method' );
+		throw new Error( 'THREE.Interpolant: Call to abstract method.' );
 		// implementations shall return this.resultBuffer
 
 	}
@@ -307,7 +307,7 @@ class Interpolant {
 	 *
 	 * @param {number} i1 - An index into the sample value buffer.
 	 * @param {number} t0 - The previous interpolation factor.
-	 * @param {number} t - The current interpolation factor.
+	 * @param {number} t1 - The next interpolation factor.
 	 */
 	intervalChanged_( /* i1, t0, t1 */ ) {
 

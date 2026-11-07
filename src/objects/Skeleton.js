@@ -72,7 +72,7 @@ class Skeleton {
 
 		/**
 		 * An array buffer holding the bone data of the previous frame.
-		 * Required for computing velocity. Maintained in {@link SkinningNode}.
+		 * Required for computing velocity.
 		 *
 		 * @type {?Float32Array}
 		 * @default null
@@ -87,6 +87,15 @@ class Skeleton {
 		 * @default null
 		 */
 		this.boneTexture = null;
+
+		/**
+		 * A texture holding the bone data of the previous frame.
+		 * Required for computing velocity.
+		 *
+		 * @type {?DataTexture}
+		 * @default null
+		 */
+		this.previousBoneTexture = null;
 
 		this.init();
 
@@ -311,6 +320,14 @@ class Skeleton {
 			this.boneTexture.dispose();
 
 			this.boneTexture = null;
+
+		}
+
+		if ( this.previousBoneTexture !== null ) {
+
+			this.previousBoneTexture.dispose();
+
+			this.previousBoneTexture = null;
 
 		}
 

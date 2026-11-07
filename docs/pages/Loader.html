@@ -26,7 +26,7 @@
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>manager</strong>
+										<strong translate="no">manager</strong>
 									</td>
 									<td class="description last">
 										<p>The loading manager.</p>
@@ -37,6 +37,14 @@
 					</div>
 				</div>
 				<h2 class="subsection-title">Properties</h2>
+				<div class="member">
+					<h3 class="name" id="cache" translate="no">.<a href="#cache">cache</a><span class="type-signature"> : 'default' | 'no-store' | 'reload' | 'no-cache' | 'force-cache'</span> </h3>
+					<div class="description">
+						<p>The HTTP cache mode passed to <code>fetch()</code>. This does not affect <a href="Cache.html">Cache</a>
+or loaders using <code>HTMLImageElement</code>.</p>
+						<p>Default is <code>'default'</code>.</p>
+					</div>
+				</div>
 				<div class="member">
 					<h3 class="name" id="crossOrigin" translate="no">.<a href="#crossOrigin">crossOrigin</a><span class="type-signature"> : string</span> </h3>
 					<div class="description">
@@ -59,6 +67,13 @@ different domain that allows CORS.</p>
 					</div>
 				</div>
 				<div class="member">
+					<h3 class="name" id="priority" translate="no">.<a href="#priority">priority</a><span class="type-signature"> : 'high' | 'low' | 'auto'</span> </h3>
+					<div class="description">
+						<p>The request priority hint. Image loaders use <code>HTMLImageElement.fetchPriority</code>.</p>
+						<p>Default is <code>'auto'</code>.</p>
+					</div>
+				</div>
+				<div class="member">
 					<h3 class="name" id="requestHeader" translate="no">.<a href="#requestHeader">requestHeader</a><span class="type-signature"> : Object.&lt;string, <a href="global.html#any">any</a>></span> </h3>
 					<div class="description">
 						<p>The <a href="https://developer.mozilla.org/en-US/docs/Glossary/Request_header" target="_blank" rel="noopener">request header</a>
@@ -78,6 +93,7 @@ used in HTTP request.</p>
 						<p>Default is <code>false</code>.</p>
 					</div>
 				</div>
+				<h2 class="subsection-title">Static Properties</h2>
 				<div class="member">
 					<h3 class="name" id=".DEFAULT_MATERIAL_NAME" translate="no">.<a href="#.DEFAULT_MATERIAL_NAME">DEFAULT_MATERIAL_NAME</a><span class="type-signature"> : string</span> </h3>
 					<div class="description">
@@ -107,7 +123,7 @@ logic for loading assets from the backend.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>url</strong>
+										<strong translate="no">url</strong>
 									</td>
 									<td class="description last">
 										<p>The path/URL of the file to be loaded.</p>
@@ -115,7 +131,7 @@ logic for loading assets from the backend.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>onLoad</strong>
+										<strong translate="no">onLoad</strong>
 									</td>
 									<td class="description last">
 										<p>Executed when the loading process has been finished.</p>
@@ -123,7 +139,7 @@ logic for loading assets from the backend.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>onProgress</strong>
+										<strong translate="no">onProgress</strong>
 									</td>
 									<td class="description last">
 										<p>Executed while the loading is in progress.</p>
@@ -131,7 +147,7 @@ logic for loading assets from the backend.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>onError</strong>
+										<strong translate="no">onError</strong>
 									</td>
 									<td class="description last">
 										<p>Executed when errors occur.</p>
@@ -149,7 +165,7 @@ logic for loading assets from the backend.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>url</strong>
+										<strong translate="no">url</strong>
 									</td>
 									<td class="description last">
 										<p>The path/URL of the file to be loaded.</p>
@@ -157,7 +173,7 @@ logic for loading assets from the backend.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>onProgress</strong>
+										<strong translate="no">onProgress</strong>
 									</td>
 									<td class="description last">
 										<p>Executed while the loading is in progress.</p>
@@ -179,7 +195,7 @@ logic for parsing the asset into three.js entities.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>data</strong>
+										<strong translate="no">data</strong>
 									</td>
 									<td class="description last">
 										<p>The data to parse.</p>
@@ -187,6 +203,29 @@ logic for parsing the asset into three.js entities.</p>
 								</tr>
 							</tbody>
 						</table>
+					</div>
+					<h3 class="name name-method" id="setCache" translate="no">.<a href="#setCache">setCache</a><span class="signature">( value : <span class="param-type">'default' | 'no-store' | 'reload' | 'no-cache' | 'force-cache'</span> )</span><span class="type-signature"> : <a href="Loader.html">Loader</a></span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Sets the HTTP cache mode for fetch requests. <code>no-cache</code> revalidates cached
+responses; <code>no-store</code> bypasses the HTTP cache. This does not affect
+<a href="Cache.html">Cache</a> or image element requests.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">value</strong>
+									</td>
+									<td class="description last">
+										<p>The HTTP cache mode.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> A reference to this instance.</dt>
+						</dl>
 					</div>
 					<h3 class="name name-method" id="setCrossOrigin" translate="no">.<a href="#setCrossOrigin">setCrossOrigin</a><span class="signature">( crossOrigin : <span class="param-type">string</span> )</span><span class="type-signature"> : <a href="Loader.html">Loader</a></span> </h3>
 					<div class="method">
@@ -198,7 +237,7 @@ from a different domain that allows CORS.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>crossOrigin</strong>
+										<strong translate="no">crossOrigin</strong>
 									</td>
 									<td class="description last">
 										<p>The <code>crossOrigin</code> value.</p>
@@ -219,10 +258,33 @@ from a different domain that allows CORS.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>path</strong>
+										<strong translate="no">path</strong>
 									</td>
 									<td class="description last">
 										<p>The base path.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> A reference to this instance.</dt>
+						</dl>
+					</div>
+					<h3 class="name name-method" id="setPriority" translate="no">.<a href="#setPriority">setPriority</a><span class="signature">( value : <span class="param-type">'high' | 'low' | 'auto'</span> )</span><span class="type-signature"> : <a href="Loader.html">Loader</a></span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Sets a browser scheduling hint. Browsers may ignore this hint.
+Internally created loaders inherit it. Loaders supplied by the application
+(for example decoder loaders or loading manager handlers) retain their own settings.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">value</strong>
+									</td>
+									<td class="description last">
+										<p>The request priority hint.</p>
 									</td>
 								</tr>
 							</tbody>
@@ -240,7 +302,7 @@ from a different domain that allows CORS.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>requestHeader</strong>
+										<strong translate="no">requestHeader</strong>
 									</td>
 									<td class="description last">
 										<p>A <a href="https://developer.mozilla.org/en-US/docs/Glossary/Request_header" target="_blank" rel="noopener">request header</a>
@@ -262,7 +324,7 @@ for configuring the HTTP request.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>resourcePath</strong>
+										<strong translate="no">resourcePath</strong>
 									</td>
 									<td class="description last">
 										<p>The resource path.</p>
@@ -285,7 +347,7 @@ headers or TLS client certificates, see <a href="https://developer.mozilla.org/e
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>value</strong>
+										<strong translate="no">value</strong>
 									</td>
 									<td class="description last">
 										<p>The <code>withCredentials</code> value.</p>

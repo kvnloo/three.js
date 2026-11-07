@@ -10,25 +10,88 @@ import { DataTexture } from '../../../textures/DataTexture.js';
 import { error } from '../../../utils.js';
 
 const glslPolyfills = {
-	bitcast_int_uint: new CodeNode( /* glsl */'uint tsl_bitcast_int_to_uint ( int x ) { return floatBitsToUint( intBitsToFloat ( x ) ); }' ),
-	bitcast_uint_int: new CodeNode( /* glsl */'uint tsl_bitcast_uint_to_int ( uint x ) { return floatBitsToInt( uintBitsToFloat ( x ) ); }' )
+	textureGather: new CodeNode( /* glsl */`
+vec4 tsl_textureGather( const int comp, sampler2D map, vec2 coord, ivec2 offset, bool flipY ) {
+	if ( flipY ) offset.y = - offset.y;
+	vec2 size = vec2( textureSize( map, 0 ) );
+	vec2 st = floor( coord * size + vec2( offset ) - 0.5 );
+	vec4 ij = vec4( st + 0.5, st + 1.5 ) / size.xyxy;
+	vec4 ret = vec4(
+		textureLod( map, ij.xw, 0.0 )[ comp ],
+		textureLod( map, ij.zw, 0.0 )[ comp ],
+		textureLod( map, ij.zy, 0.0 )[ comp ],
+		textureLod( map, ij.xy, 0.0 )[ comp ]
+	);
+	return flipY ? ret.wzyx : ret;
+}
+` ),
+	textureGatherArray: new CodeNode( /* glsl */`
+vec4 tsl_textureGather_array( const int comp, sampler2DArray map, vec3 coord, ivec2 offset, bool flipY ) {
+	if ( flipY ) offset.y = - offset.y;
+	vec2 size = vec2( textureSize( map, 0 ).xy );
+	vec2 st = floor( coord.xy * size + vec2( offset ) - 0.5 );
+	vec4 ij = vec4( st + 0.5, st + 1.5 ) / size.xyxy;
+	vec4 ret = vec4(
+		textureLod( map, vec3( ij.xw, coord.z ), 0.0 )[ comp ],
+		textureLod( map, vec3( ij.zw, coord.z ), 0.0 )[ comp ],
+		textureLod( map, vec3( ij.zy, coord.z ), 0.0 )[ comp ],
+		textureLod( map, vec3( ij.xy, coord.z ), 0.0 )[ comp ]
+	);
+	return flipY ? ret.wzyx : ret;
+}
+` ),
+	textureGatherCompare: new CodeNode( /* glsl */`
+vec4 tsl_textureGatherCompare( sampler2DShadow map, vec2 coord, ivec2 offset, float ref, bool flipY ) {
+	if ( flipY ) offset.y = - offset.y;
+	vec2 size = vec2( textureSize( map, 0 ) );
+	vec2 st = floor( coord * size + vec2( offset ) - 0.5 );
+	vec4 ij = vec4( st + 0.5, st + 1.5 ) / size.xyxy;
+	vec4 ret = vec4(
+		textureLod( map, vec3( ij.xw, ref ), 0.0 ),
+		textureLod( map, vec3( ij.zw, ref ), 0.0 ),
+		textureLod( map, vec3( ij.zy, ref ), 0.0 ),
+		textureLod( map, vec3( ij.xy, ref ), 0.0 )
+	);
+	return flipY ? ret.wzyx : ret;
+}
+` ),
+	textureGatherCompareArray: new CodeNode( /* glsl */`
+vec4 tsl_textureGatherCompare_array( sampler2DArrayShadow map, vec3 coord, ivec2 offset, float ref, bool flipY ) {
+	if ( flipY ) offset.y = - offset.y;
+	vec2 size = vec2( textureSize( map, 0 ).xy );
+	vec2 st = floor( coord.xy * size + vec2( offset ) - 0.5 );
+	vec4 ij = vec4( st + 0.5, st + 1.5 ) / size.xyxy;
+	vec4 ret = vec4(
+		texture( map, vec4( ij.xw, coord.z, ref ) ),
+		texture( map, vec4( ij.zw, coord.z, ref ) ),
+		texture( map, vec4( ij.zy, coord.z, ref ) ),
+		texture( map, vec4( ij.xy, coord.z, ref ) )
+	);
+	return flipY ? ret.wzyx : ret;
+}
+` ),
+	floatpack_snorm_4x8: new CodeNode( /* glsl */'uint tsl_packSnorm4x8( vec4 v ) { uvec4 u = uvec4( ivec4( round( clamp( v, -1.0, 1.0 ) * 127.0 ) ) & 0xff ); return u.x | u.y << 8 | u.z << 16 | u.w << 24; }' ),
+	floatpack_unorm_4x8: new CodeNode( /* glsl */'uint tsl_packUnorm4x8( vec4 v ) { uvec4 u = uvec4( round( clamp( v, 0.0, 1.0 ) * 255.0 ) ); return u.x | u.y << 8 | u.z << 16 | u.w << 24; }' ),
+	floatunpack_snorm_4x8: new CodeNode( /* glsl */'vec4 tsl_unpackSnorm4x8( uint x ) { return max( vec4( ivec4( x << 24, x << 16, x << 8, x ) >> 24 ) / 127.0, -1.0 ); }' ),
+	floatunpack_unorm_4x8: new CodeNode( /* glsl */'vec4 tsl_unpackUnorm4x8( uint x ) { return vec4( uvec4( x, x >> 8, x >> 16, x >> 24 ) & 0xffu ) / 255.0; }' )
 };
 
 const glslMethods = {
-	textureDimensions: 'textureSize',
 	equals: 'equal',
 	bitcast_float_int: 'floatBitsToInt',
 	bitcast_int_float: 'intBitsToFloat',
 	bitcast_uint_float: 'uintBitsToFloat',
 	bitcast_float_uint: 'floatBitsToUint',
-	bitcast_uint_int: 'tsl_bitcast_uint_to_int',
-	bitcast_int_uint: 'tsl_bitcast_int_to_uint',
 	floatpack_snorm_2x16: 'packSnorm2x16',
 	floatpack_unorm_2x16: 'packUnorm2x16',
 	floatpack_float16_2x16: 'packHalf2x16',
+	floatpack_snorm_4x8: 'tsl_packSnorm4x8',
+	floatpack_unorm_4x8: 'tsl_packUnorm4x8',
 	floatunpack_snorm_2x16: 'unpackSnorm2x16',
 	floatunpack_unorm_2x16: 'unpackUnorm2x16',
-	floatunpack_float16_2x16: 'unpackHalf2x16'
+	floatunpack_float16_2x16: 'unpackHalf2x16',
+	floatunpack_snorm_4x8: 'tsl_unpackSnorm4x8',
+	floatunpack_unorm_4x8: 'tsl_unpackUnorm4x8'
 };
 
 const precisionLib = {
@@ -73,6 +136,30 @@ precision highp sampler2DShadow;
 precision highp sampler2DArrayShadow;
 precision highp samplerCubeShadow;
 `;
+
+const glslReservedKeywords = new Set( [
+	// keywords
+	'const', 'uniform', 'buffer', 'shared', 'attribute', 'varying', 'coherent', 'volatile', 'restrict',
+	'readonly', 'writeonly', 'atomic_uint', 'layout', 'centroid', 'flat', 'smooth', 'noperspective',
+	'patch', 'sample', 'invariant', 'precise', 'break', 'continue', 'do', 'for', 'while', 'switch',
+	'case', 'default', 'if', 'else', 'subroutine', 'in', 'out', 'inout', 'int', 'void', 'bool', 'true',
+	'false', 'float', 'double', 'discard', 'return', 'vec2', 'vec3', 'vec4', 'ivec2', 'ivec3', 'ivec4',
+	'bvec2', 'bvec3', 'bvec4', 'uint', 'uvec2', 'uvec3', 'uvec4', 'dvec2', 'dvec3', 'dvec4', 'mat2',
+	'mat3', 'mat4', 'mat2x2', 'mat2x3', 'mat2x4', 'mat3x2', 'mat3x3', 'mat3x4', 'mat4x2', 'mat4x3',
+	'mat4x4', 'dmat2', 'dmat3', 'dmat4', 'dmat2x2', 'dmat2x3', 'dmat2x4', 'dmat3x2', 'dmat3x3',
+	'dmat3x4', 'dmat4x2', 'dmat4x3', 'dmat4x4', 'lowp', 'mediump', 'highp', 'precision', 'sampler2D',
+	'sampler3D', 'samplerCube', 'sampler2DShadow', 'samplerCubeShadow', 'sampler2DArray',
+	'sampler2DArrayShadow', 'isampler2D', 'isampler3D', 'isamplerCube', 'isampler2DArray', 'usampler2D',
+	'usampler3D', 'usamplerCube', 'usampler2DArray', 'struct',
+	// reserved for future use
+	'common', 'partition', 'active', 'asm', 'class', 'union', 'enum', 'typedef', 'template', 'this',
+	'resource', 'goto', 'inline', 'noinline', 'public', 'static', 'extern', 'external', 'interface',
+	'long', 'short', 'half', 'fixed', 'unsigned', 'superp', 'input', 'output', 'hvec2', 'hvec3',
+	'hvec4', 'fvec2', 'fvec3', 'fvec4', 'sampler3DRect', 'filter', 'sizeof', 'cast', 'namespace',
+	'using',
+	// generated entry points
+	'main'
+] );
 
 /**
  * A node builder targeting GLSL.
@@ -182,11 +269,23 @@ class GLSLNodeBuilder extends NodeBuilder {
 	 *
 	 * @param {string} type - The output type to bitcast to.
 	 * @param {string} inputType - The input type of the.
-	 * @return {string} The resolved WGSL bitcast invocation.
+	 * @return {string} The resolved GLSL bitcast invocation.
 	 */
 	getBitcastMethod( type, inputType ) {
 
-		return this.getMethod( `bitcast_${ inputType }_${ type }` );
+		const inputComponentType = this.getComponentType( inputType );
+		const componentType = this.getComponentType( type );
+
+		// integer types support bitcast implicitly via the type constructor
+
+		if ( inputComponentType !== 'float' && componentType !== 'float' &&
+			this.getTypeLength( inputType ) === this.getTypeLength( type ) ) {
+
+			return this.getType( type );
+
+		}
+
+		return this.getMethod( `bitcast_${ inputComponentType }_${ componentType }` );
 
 	}
 
@@ -194,11 +293,12 @@ class GLSLNodeBuilder extends NodeBuilder {
 	 * Returns the float packing method name for a given numeric encoding.
 	 *
 	 * @param {string} encoding - The numeric encoding that describes how the float values are mapped to the integer range.
+	 * @param {string} [layout='2x16'] - The component layout of the packed integer.
 	 * @returns {string} The resolved GLSL float packing method name.
 	 */
-	getFloatPackingMethod( encoding ) {
+	getFloatPackingMethod( encoding, layout = '2x16' ) {
 
-		return this.getMethod( `floatpack_${ encoding }_2x16` );
+		return this.getMethod( `floatpack_${ encoding }_${ layout }` );
 
 	}
 
@@ -206,11 +306,12 @@ class GLSLNodeBuilder extends NodeBuilder {
 	 * Returns the float unpacking method name for a given numeric encoding.
 	 *
 	 * @param {string} encoding - The numeric encoding that describes how the integer values are mapped to the float range.
+	 * @param {string} [layout='2x16'] - The component layout of the packed integer.
 	 * @returns {string} The resolved GLSL float unpacking method name.
 	 */
-	getFloatUnpackingMethod( encoding ) {
+	getFloatUnpackingMethod( encoding, layout = '2x16' ) {
 
-		return this.getMethod( `floatunpack_${ encoding }_2x16` );
+		return this.getMethod( `floatunpack_${ encoding }_${ layout }` );
 
 	}
 
@@ -225,6 +326,47 @@ class GLSLNodeBuilder extends NodeBuilder {
 	getTernary( condSnippet, ifSnippet, elseSnippet ) {
 
 		return `${condSnippet} ? ${ifSnippet} : ${elseSnippet}`;
+
+	}
+
+	/**
+	 * Returns the native snippet for a genuinely per-component vector select.
+	 * GLSL has no vector ternary, so `float` types use `mix()`'s `bvecN`-selector
+	 * overload; `int`/`uint`/`bool` types use an arithmetic select instead, since
+	 * that overload doesn't exist for them.
+	 *
+	 * @param {string} condSnippet - The per-component boolean (`bvecN`) condition.
+	 * @param {string} ifSnippet - The vector expression selected where `condSnippet` is `true`.
+	 * @param {string} elseSnippet - The vector expression selected where `condSnippet` is `false`.
+	 * @param {string} type - The (vector) type of `ifSnippet`/`elseSnippet`.
+	 * @return {string} The resolved method name.
+	 */
+	getVectorSelect( condSnippet, ifSnippet, elseSnippet, type ) {
+
+		const componentType = this.getComponentType( type );
+
+		if ( componentType === 'float' ) {
+
+			return `mix( ${elseSnippet}, ${ifSnippet}, ${condSnippet} )`;
+
+		}
+
+		const glslType = this.getType( type );
+
+		if ( componentType === 'bool' ) {
+
+			const intType = this.getType( this.getTypeFromLength( this.getTypeLength( type ), 'int' ) );
+			const maskSnippet = `${intType}( ${condSnippet} )`;
+			const ifIntSnippet = `${intType}( ${ifSnippet} )`;
+			const elseIntSnippet = `${intType}( ${elseSnippet} )`;
+
+			return `${glslType}( ${elseIntSnippet} + ${maskSnippet} * ( ${ifIntSnippet} - ${elseIntSnippet} ) )`;
+
+		}
+
+		const maskSnippet = `${glslType}( ${condSnippet} )`;
+
+		return `${elseSnippet} + ${maskSnippet} * ( ${ifSnippet} - ${elseSnippet} )`;
 
 	}
 
@@ -369,6 +511,18 @@ ${ flowData.code }
 	}
 
 	/**
+	 * Returns whether the given name is a reserved keyword of GLSL.
+	 *
+	 * @param {string} name - The name to test.
+	 * @return {boolean} Whether the name is a reserved keyword or not.
+	 */
+	isReservedKeyword( name ) {
+
+		return glslReservedKeywords.has( name );
+
+	}
+
+	/**
 	 * Setups the Pixel Buffer Object (PBO) for the given storage
 	 * buffer node.
 	 *
@@ -447,7 +601,10 @@ ${ flowData.code }
 
 			}
 
-			this.addLineFlowCode( `${ propertyName } = ${prefix}(${ snippet })${channel}`, storageArrayElementNode );
+			const texelType = this.getTypeFromLength( itemSize, this.getComponentType( prefix ) );
+			const elementType = storageArrayElementNode.getNodeType( this );
+
+			this.addLineFlowCode( `${ propertyName } = ${ this.format( `${prefix}(${ snippet })${channel}`, texelType, elementType ) }`, storageArrayElementNode );
 
 			elementNodeData.propertyName = propertyName;
 
@@ -478,11 +635,11 @@ ${ flowData.code }
 
 			if ( offsetSnippet ) {
 
-				snippet = `texelFetchOffset( ${ textureProperty }, ivec3( ${ uvIndexSnippet }, ${ depthSnippet } ), ${ levelSnippet }, ${ offsetSnippet } )`;
+				snippet = `texelFetchOffset( ${ textureProperty }, ivec3( ${ uvIndexSnippet }, ${ depthSnippet } ), int( ${ levelSnippet } ), ${ offsetSnippet } )`;
 
 			} else {
 
-				snippet = `texelFetch( ${ textureProperty }, ivec3( ${ uvIndexSnippet }, ${ depthSnippet } ), ${ levelSnippet } )`;
+				snippet = `texelFetch( ${ textureProperty }, ivec3( ${ uvIndexSnippet }, ${ depthSnippet } ), int( ${ levelSnippet } ) )`;
 
 			}
 
@@ -490,11 +647,11 @@ ${ flowData.code }
 
 			if ( offsetSnippet ) {
 
-				snippet = `texelFetchOffset( ${ textureProperty }, ${ uvIndexSnippet }, ${ levelSnippet }, ${ offsetSnippet } )`;
+				snippet = `texelFetchOffset( ${ textureProperty }, ${ uvIndexSnippet }, int( ${ levelSnippet } ), ${ offsetSnippet } )`;
 
 			} else {
 
-				snippet = `texelFetch( ${ textureProperty }, ${ uvIndexSnippet }, ${ levelSnippet } )`;
+				snippet = `texelFetch( ${ textureProperty }, ${ uvIndexSnippet }, int( ${ levelSnippet } ) )`;
 
 			}
 
@@ -539,16 +696,45 @@ ${ flowData.code }
 	}
 
 	/**
+	 * Generates the GLSL snippet that resolves the dimensions of the given texture.
+	 *
+	 * @param {Texture} texture - The texture.
+	 * @param {string} textureProperty - The name of the texture uniform in the shader.
+	 * @param {string} levelSnippet - A GLSL snippet that represents the mip level.
+	 * @return {string} The GLSL snippet.
+	 */
+	generateTextureSize( texture, textureProperty, levelSnippet ) {
+
+		return `textureSize( ${ textureProperty }, ${ levelSnippet } )`;
+
+	}
+
+	/**
 	 * Generates the GLSL snippet when sampling textures with explicit mip level.
 	 *
 	 * @param {Texture} texture - The texture.
 	 * @param {string} textureProperty - The name of the texture uniform in the shader.
 	 * @param {string} uvSnippet - A GLSL snippet that represents texture coordinates used for sampling.
 	 * @param {string} levelSnippet - A GLSL snippet that represents the mip level, with level 0 containing a full size version of the texture.
+	 * @param {?string} depthSnippet - A GLSL snippet that represents 0-based texture array index to sample.
 	 * @param {?string} offsetSnippet - A GLSL snippet that represents the offset that will be applied to the unnormalized texture coordinate before sampling the texture.
 	 * @return {string} The GLSL snippet.
 	 */
-	generateTextureLevel( texture, textureProperty, uvSnippet, levelSnippet, offsetSnippet ) {
+	generateTextureLevel( texture, textureProperty, uvSnippet, levelSnippet, depthSnippet, offsetSnippet ) {
+
+		if ( depthSnippet ) uvSnippet = `vec3( ${ uvSnippet }, ${ depthSnippet } )`;
+
+		if ( texture.isDepthTexture ) {
+
+			if ( offsetSnippet ) {
+
+				return `textureLodOffset( ${ textureProperty }, ${ uvSnippet }, ${ levelSnippet }, ${ offsetSnippet } ).x`;
+
+			}
+
+			return `textureLod( ${ textureProperty }, ${ uvSnippet }, ${ levelSnippet } ).x`;
+
+		}
 
 		if ( offsetSnippet ) {
 
@@ -567,10 +753,13 @@ ${ flowData.code }
 	 * @param {string} textureProperty - The name of the texture uniform in the shader.
 	 * @param {string} uvSnippet - A GLSL snippet that represents texture coordinates used for sampling.
 	 * @param {string} biasSnippet - A GLSL snippet that represents the bias to apply to the mip level before sampling.
+	 * @param {?string} depthSnippet - A GLSL snippet that represents 0-based texture array index to sample.
 	 * @param {?string} offsetSnippet - A GLSL snippet that represents the offset that will be applied to the unnormalized texture coordinate before sampling the texture.
 	 * @return {string} The GLSL snippet.
 	 */
-	generateTextureBias( texture, textureProperty, uvSnippet, biasSnippet, offsetSnippet ) {
+	generateTextureBias( texture, textureProperty, uvSnippet, biasSnippet, depthSnippet, offsetSnippet ) {
+
+		if ( depthSnippet ) uvSnippet = `vec3( ${ uvSnippet }, ${ depthSnippet } )`;
 
 		if ( offsetSnippet ) {
 
@@ -589,10 +778,13 @@ ${ flowData.code }
 	 * @param {string} textureProperty - The name of the texture uniform in the shader.
 	 * @param {string} uvSnippet - A GLSL snippet that represents texture coordinates used for sampling.
 	 * @param {Array<string>} gradSnippet - An array holding both gradient GLSL snippets.
+	 * @param {?string} depthSnippet - A GLSL snippet that represents 0-based texture array index to sample.
 	 * @param {?string} offsetSnippet - A GLSL snippet that represents the offset that will be applied to the unnormalized texture coordinate before sampling the texture.
 	 * @return {string} The GLSL snippet.
 	 */
-	generateTextureGrad( texture, textureProperty, uvSnippet, gradSnippet, offsetSnippet ) {
+	generateTextureGrad( texture, textureProperty, uvSnippet, gradSnippet, depthSnippet, offsetSnippet ) {
+
+		if ( depthSnippet ) uvSnippet = `vec3( ${ uvSnippet }, ${ depthSnippet } )`;
 
 		if ( offsetSnippet ) {
 
@@ -657,28 +849,103 @@ ${ flowData.code }
 	}
 
 	/**
-	 * Returns the variables of the given shader stage as a GLSL string.
+	 * Generates the GLSL snippet for gathering four texels from the given texture.
 	 *
-	 * @param {string} shaderStage - The shader stage.
-	 * @return {string} The GLSL snippet that defines the variables.
+	 * @param {Texture} texture - The texture.
+	 * @param {string} textureProperty - The name of the texture uniform in the shader.
+	 * @param {string} uvSnippet - A GLSL snippet that represents texture coordinates used for sampling.
+	 * @param {string} gatherSnippet - A GLSL snippet that represents the index of the channel to read.
+	 * @param {?string} depthSnippet - A GLSL snippet that represents 0-based texture array index to sample.
+	 * @param {?string} offsetSnippet - A GLSL snippet that represents the offset that will be applied to the unnormalized texture coordinate before sampling the texture.
+	 * @param {?string} flipYSnippet - A GLSL snippet that represents the y-flip. Only used for WebGL.
+	 * @return {string} The GLSL snippet.
 	 */
-	getVars( shaderStage ) {
+	generateTextureGather( texture, textureProperty, uvSnippet, gatherSnippet, depthSnippet, offsetSnippet, flipYSnippet ) {
 
-		const snippets = [];
+		if ( texture.isDepthTexture ) gatherSnippet = '0';
 
-		const vars = this.vars[ shaderStage ];
+		if ( offsetSnippet === null ) offsetSnippet = 'ivec2( 0 )';
 
-		if ( vars !== undefined ) {
+		if ( flipYSnippet === null ) flipYSnippet = 'false';
 
-			for ( const variable of vars ) {
+		if ( depthSnippet ) {
 
-				snippets.push( `${ this.getVar( variable.type, variable.name, variable.count ) };` );
+			this._include( 'textureGatherArray' );
 
-			}
+			return `tsl_textureGather_array( ${gatherSnippet}, ${ textureProperty }, vec3( ${ uvSnippet }, ${ depthSnippet } ), ${ offsetSnippet }, ${ flipYSnippet } )`;
 
 		}
 
-		return snippets.join( '\n\t' );
+		this._include( 'textureGather' );
+
+		return `tsl_textureGather( ${gatherSnippet}, ${ textureProperty }, ${ uvSnippet }, ${ offsetSnippet }, ${ flipYSnippet } )`;
+
+	}
+
+	/**
+	 * Generates the GLSL snippet for performing a depth comparison on four texels in the given depth texture.
+	 *
+	 * @param {Texture} texture - The texture.
+	 * @param {string} textureProperty - The name of the texture uniform in the shader.
+	 * @param {string} uvSnippet - A GLSL snippet that represents texture coordinates used for sampling.
+	 * @param {string} compareSnippet - A GLSL snippet that represents the reference value.
+	 * @param {?string} depthSnippet - A GLSL snippet that represents 0-based texture array index to sample.
+	 * @param {?string} offsetSnippet - A GLSL snippet that represents the offset that will be applied to the unnormalized texture coordinate before sampling the texture.
+	 * @param {?string} flipYSnippet - A GLSL snippet that represents the y-flip. Only used for WebGL.
+	 * @return {string} The GLSL snippet.
+	 */
+	generateTextureGatherCompare( texture, textureProperty, uvSnippet, compareSnippet, depthSnippet, offsetSnippet, flipYSnippet ) {
+
+		if ( offsetSnippet === null ) offsetSnippet = 'ivec2( 0 )';
+
+		if ( flipYSnippet === null ) flipYSnippet = 'false';
+
+		if ( depthSnippet ) {
+
+			this._include( 'textureGatherCompareArray' );
+
+			return `tsl_textureGatherCompare_array( ${ textureProperty }, vec3( ${ uvSnippet }, ${depthSnippet} ), ${ offsetSnippet }, ${ compareSnippet }, ${ flipYSnippet } )`;
+
+		}
+
+		this._include( 'textureGatherCompare' );
+
+		return `tsl_textureGatherCompare( ${ textureProperty }, ${ uvSnippet }, ${ offsetSnippet }, ${ compareSnippet }, ${ flipYSnippet } )`;
+
+	}
+
+	/**
+	 * Returns the uniform block name of the given buffer uniform.
+	 *
+	 * @param {NodeUniform} uniform - The buffer uniform.
+	 * @param {string} shaderStage - The shader stage.
+	 * @return {string} The uniform block name.
+	 */
+	getUniformBufferName( uniform, shaderStage ) {
+
+		return this.getDataFromNode( uniform.node, shaderStage, this.globalCache ).uniformGPU.name;
+
+	}
+
+	/**
+	 * Returns a bind group for the given group name and bindings. Uniform blocks are
+	 * named after their position in the group since shared bind groups are created
+	 * by one build but looked up by name in the programs of every build sharing them.
+	 *
+	 * @private
+	 * @param {string} groupName - The group name.
+	 * @param {Array<NodeUniformsGroup>} bindings - List of bindings.
+	 * @return {BindGroup} The bind group
+	 */
+	_getBindGroup( groupName, bindings ) {
+
+		for ( let i = 0; i < bindings.length; i ++ ) {
+
+			if ( bindings[ i ].isNodeUniformBuffer === true ) bindings[ i ].name = 'NodeBuffer_' + groupName + '_' + i;
+
+		}
+
+		return super._getBindGroup( groupName, bindings );
 
 	}
 
@@ -702,29 +969,17 @@ ${ flowData.code }
 
 			if ( uniform.type === 'texture' || uniform.type === 'texture3D' ) {
 
-				const texture = uniform.node.value;
+				const textureNode = uniform.node;
+				const texture = textureNode.value;
 
-				let typePrefix = '';
-
-				if ( texture.isDataTexture === true || texture.isData3DTexture === true ) {
-
-					if ( texture.type === UnsignedIntType ) {
-
-						typePrefix = 'u';
-
-					} else if ( texture.type === IntType ) {
-
-						typePrefix = 'i';
-
-					}
-
-				}
+				const componentType = this.getComponentTypeFromTexture( texture );
+				const typePrefix = componentType === 'float' ? '' : componentType.charAt( 0 );
 
 				if ( uniform.type === 'texture3D' && texture.isArrayTexture === false ) {
 
 					snippet = `${typePrefix}sampler3D ${ uniform.name };`;
 
-				} else if ( texture.compareFunction ) {
+				} else if ( texture.compareFunction && textureNode.isSampleCompare() ) {
 
 					if ( texture.isArrayTexture === true ) {
 
@@ -752,7 +1007,17 @@ ${ flowData.code }
 
 			} else if ( uniform.type === 'cubeDepthTexture' ) {
 
-				snippet = `samplerCubeShadow ${ uniform.name };`;
+				const texture = uniform.node.value;
+
+				if ( texture.compareFunction ) {
+
+					snippet = `samplerCubeShadow ${ uniform.name };`;
+
+				} else {
+
+					snippet = `samplerCube ${ uniform.name };`;
+
+				}
 
 			} else if ( uniform.type === 'buffer' ) {
 
@@ -761,7 +1026,7 @@ ${ flowData.code }
 				const bufferCount = bufferNode.bufferCount;
 
 				const bufferCountSnippet = bufferCount > 0 ? bufferCount : '';
-				snippet = `${bufferNode.name} {\n\t${ bufferType } ${ uniform.name }[${ bufferCountSnippet }];\n};\n`;
+				snippet = `${ this.getUniformBufferName( uniform, shaderStage ) } {\n\t${ bufferType } ${ uniform.name }[${ bufferCountSnippet }];\n};\n`;
 
 			} else {
 
@@ -953,13 +1218,41 @@ ${ flowData.code }
 
 		}
 
-		if ( outputSnippet.length === 0 ) {
+		if ( shaderStage === 'fragment' && outputSnippet.length === 0 ) {
 
-			outputSnippet.push( 'layout( location = 0 ) out vec4 fragColor;' );
+			outputSnippet.push( `layout( location = 0 ) out ${ this.getOutputType() } fragColor;` );
 
 		}
 
 		return '\n' + outputSnippet.join( '\n' ) + '\n\n' + snippets.join( '\n' );
+
+	}
+
+	/**
+	 * Returns a single const variable statement as a GLSL string for the given variable type and name.
+	 *
+	 * @param {string} type - The variable's type.
+	 * @param {string} name - The variable's name.
+	 * @param {?number} [count=null] - The array length.
+	 * @return {string} The GLSL snippet that defines a const variable.
+	 */
+	generateConstStatement( type, name, count = null ) {
+
+		return `const ${ this.getVar( type, name, count ) }`;
+
+	}
+
+	/**
+	 * Returns a single variable statement as a GLSL string for the given variable type and name.
+	 *
+	 * @param {string} type - The variable's type.
+	 * @param {string} name - The variable's name.
+	 * @param {?number} [count=null] - The array length.
+	 * @return {string} The GLSL snippet that defines a variable.
+	 */
+	generateVarStatement( type, name, count = null ) {
+
+		return this.getVar( type, name, count );
 
 	}
 
@@ -971,7 +1264,7 @@ ${ flowData.code }
 	 */
 	getVaryings( shaderStage ) {
 
-		let snippet = '';
+		let snippet = shaderStage === 'vertex' && this.context.invariant === true ? 'invariant gl_Position;\n' : '';
 
 		const varyings = this.varyings;
 
@@ -1078,7 +1371,7 @@ ${ flowData.code }
 	 */
 	getInvocationLocalIndex() {
 
-		const workgroupSize = this.object.workgroupSize;
+		const workgroupSize = this.compute.workgroupSize;
 
 		const size = workgroupSize.reduce( ( acc, curr ) => acc * curr, 1 );
 
@@ -1114,6 +1407,36 @@ ${ flowData.code }
 	}
 
 	/**
+	 * Enables subgroups.
+	 */
+	enableSubGroups() {
+
+		error( 'GLSLNodeBuilder: WebGLBackend does not support subgroup operations' );
+
+	}
+
+	/**
+	 * Enables 16 bit floats.
+	 */
+	enableShaderF16() {
+
+		error( 'GLSLNodeBuilder: WebGLBackend does not support 16 bit floats' );
+
+	}
+
+	/**
+	 * Enables dual source blending.
+	 *
+	 * WebGL 2 can express this through the `WEBGL_blend_func_extended` extension,
+	 * but WebGLBackend does not implement it.
+	 */
+	enableDualSourceBlending() {
+
+		error( 'GLSLNodeBuilder: WebGLBackend does not support dual source blending' );
+
+	}
+
+	/**
 	 * Returns the draw index builtin.
 	 *
 	 * @return {?string} The drawIndex shader string. Returns `null` if `WEBGL_multi_draw` isn't supported by the device.
@@ -1126,9 +1449,11 @@ ${ flowData.code }
 
 			return 'uint( gl_DrawID )';
 
-		}
+		} else {
 
-		return null;
+			return 'nodeUniformDrawId'; // fallback to uniform
+
+		}
 
 	}
 
@@ -1395,6 +1720,9 @@ ${shaderData.extensions}
 // precision
 ${ defaultPrecisions }
 
+// structs
+${shaderData.structs}
+
 // uniforms
 ${shaderData.uniforms}
 
@@ -1404,13 +1732,13 @@ ${shaderData.varyings}
 // attributes
 ${shaderData.attributes}
 
+// vars
+${shaderData.vars}
+
 // codes
 ${shaderData.codes}
 
 void main() {
-
-	// vars
-	${shaderData.vars}
 
 	// transforms
 	${shaderData.transforms}
@@ -1453,13 +1781,13 @@ ${shaderData.uniforms}
 // varyings
 ${shaderData.varyings}
 
+// vars
+${shaderData.vars}
+
 // codes
 ${shaderData.codes}
 
 void main() {
-
-	// vars
-	${shaderData.vars}
 
 	// flow
 	${shaderData.flow}
@@ -1508,14 +1836,14 @@ void main() {
 					if ( shaderStage === 'vertex' ) {
 
 						flow += 'gl_Position = ';
-						flow += `${ flowSlotData.result };`;
+						flow += `${ this.format( flowSlotData.result, mainNode.getNodeType( this ), 'vec4' ) };`;
 
 					} else if ( shaderStage === 'fragment' ) {
 
 						if ( ! node.outputNode.isOutputStructNode ) {
 
 							flow += 'fragColor = ';
-							flow += `${ flowSlotData.result };`;
+							flow += `${ this.format( flowSlotData.result, mainNode.getNodeType( this ), this.getOutputType() ) };`;
 
 						}
 
@@ -1531,11 +1859,25 @@ void main() {
 			stageData.uniforms = this.getUniforms( shaderStage );
 			stageData.attributes = this.getAttributes( shaderStage );
 			stageData.varyings = this.getVaryings( shaderStage );
-			stageData.vars = this.getVars( shaderStage );
+			stageData.vars = this.getVars( shaderStage, true );
 			stageData.structs = this.getStructs( shaderStage );
 			stageData.codes = this.getCodes( shaderStage );
 			stageData.transforms = this.getTransforms( shaderStage );
 			stageData.flow = flow;
+
+			// fallbacks
+
+			if ( shaderStage === 'vertex' ) {
+
+				const ext = this.renderer.backend.extensions;
+
+				if ( this.object.isBatchedMesh && ext.has( 'WEBGL_multi_draw' ) === false ) {
+
+					stageData.uniforms += '\nuniform uint nodeUniformDrawId;\n';
+
+				}
+
+			}
 
 		}
 
@@ -1567,7 +1909,7 @@ void main() {
 	 */
 	getUniformFromNode( node, type, shaderStage, name = null ) {
 
-		const uniformNode = super.getUniformFromNode( node, type, shaderStage, name );
+		const uniformNode = super.getUniformFromNode( node, type, shaderStage, type === 'buffer' ? null : name );
 		const nodeData = this.getDataFromNode( node, shaderStage, this.globalCache );
 
 		let uniformGPU = nodeData.uniformGPU;
@@ -1596,22 +1938,7 @@ void main() {
 
 			} else if ( type === 'buffer' ) {
 
-				uniformNode.name = `buffer${ node.id }`;
-
-				const sharedData = this.getSharedDataFromNode( node );
-
-				let buffer = sharedData.buffer;
-
-				if ( buffer === undefined ) {
-
-					node.name = `NodeBuffer_${ node.id }`;
-
-					buffer = new NodeUniformBuffer( node, group );
-					buffer.name = node.name;
-
-					sharedData.buffer = buffer;
-
-				}
+				const buffer = new NodeUniformBuffer( node, group );
 
 				bindings.push( buffer );
 

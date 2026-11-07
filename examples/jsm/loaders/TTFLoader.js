@@ -2,7 +2,7 @@ import {
 	FileLoader,
 	Loader
 } from 'three';
-import opentype from '../libs/opentype.module.js';
+import opentype from 'https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/+esm';
 
 /**
  * A loader for the TTF format.
@@ -54,6 +54,8 @@ class TTFLoader extends Loader {
 		const scope = this;
 
 		const loader = new FileLoader( this.manager );
+		loader.setPriority( this.priority );
+		loader.setCache( this.cache );
 		loader.setPath( this.path );
 		loader.setResponseType( 'arraybuffer' );
 		loader.setRequestHeader( this.requestHeader );

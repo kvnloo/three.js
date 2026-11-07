@@ -31,7 +31,6 @@ const UniformsLib = {
 
 		envMap: { value: null },
 		envMapRotation: { value: /*@__PURE__*/ new Matrix3() },
-		flipEnvMap: { value: - 1 },
 		reflectivity: { value: 1.0 }, // basic, lambert, phong
 		ior: { value: 1.5 }, // physical
 		refractionRatio: { value: 0.98 }, // basic, lambert, phong
@@ -122,6 +121,22 @@ const UniformsLib = {
 
 		lightProbe: { value: [] },
 
+		sunLights: { value: [], properties: {
+			direction: {},
+			color: {}
+		} },
+
+		sunLightShadows: { value: [], properties: {
+			shadowIntensity: 1,
+			shadowBias: {},
+			shadowNormalBias: {},
+			shadowRadius: {},
+			shadowMapSize: {}
+		} },
+
+		sunShadowMatrix: { value: [] },
+		sunShadowCascade: { value: [] },
+
 		directionalLights: { value: [], properties: {
 			direction: {},
 			color: {}
@@ -192,7 +207,12 @@ const UniformsLib = {
 		} },
 
 		ltc_1: { value: null },
-		ltc_2: { value: null }
+		ltc_2: { value: null },
+
+		probesSH: { value: [] },
+		probesMin: { value: [] },
+		probesMax: { value: [] },
+		probesResolution: { value: [] }
 
 	},
 

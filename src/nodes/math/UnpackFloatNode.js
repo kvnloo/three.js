@@ -1,12 +1,12 @@
-import TempNode from '../core/TempNode.js';
-import { nodeProxyIntent } from '../tsl/TSLCore.js';
+import Node from '../core/Node.js';
+import { nodeProxyAssignable } from '../tsl/TSLCore.js';
 
 /**
  * This node represents an operation that unpacks values from a 32-bit unsigned integer, reinterpreting the results as a floating-point vector
  *
- * @augments TempNode
+ * @augments Node
  */
-class UnpackFloatNode extends TempNode {
+class UnpackFloatNode extends Node {
 
 	static get type() {
 
@@ -38,6 +38,14 @@ class UnpackFloatNode extends TempNode {
 		this.encoding = encoding;
 
 		/**
+		 * The component layout of the packed integer.
+		 *
+		 * @type {'2x16' | '4x8'}
+		 * @default '2x16'
+		 */
+		this.layout = '2x16';
+
+		/**
 		 * This flag can be used for type testing.
 		 *
 		 * @type {boolean}
@@ -48,16 +56,16 @@ class UnpackFloatNode extends TempNode {
 
 	}
 
-	getNodeType() {
+	generateNodeType() {
 
-		return 'vec2';
+		return this.layout === '4x8' ? 'vec4' : 'vec2';
 
 	}
 
 	generate( builder ) {
 
 		const inputType = this.uintNode.getNodeType( builder );
-		return `${ builder.getFloatUnpackingMethod( this.encoding ) }(${ this.uintNode.build( builder, inputType )})`;
+		return `${ builder.getFloatUnpackingMethod( this.encoding, this.layout ) }(${ this.uintNode.build( builder, inputType )})`;
 
 	}
 
@@ -73,7 +81,7 @@ export default UnpackFloatNode;
  * @param {Node<uint>} value - The unsigned integer to be unpacked
  * @returns {Node}
  */
-export const unpackSnorm2x16 = /*@__PURE__*/ nodeProxyIntent( UnpackFloatNode, 'snorm' ).setParameterLength( 1 );
+export const unpackSnorm2x16 = /*@__PURE__*/ nodeProxyAssignable( UnpackFloatNode, 'snorm' ).setParameterLength( 1 );
 
 /**
  * Unpacks a 32-bit unsigned integer into two 16-bit values, interpreted as normalized unsigned integers. Returns a vec2 with both values.
@@ -83,7 +91,7 @@ export const unpackSnorm2x16 = /*@__PURE__*/ nodeProxyIntent( UnpackFloatNode, '
  * @param {Node<uint>} value - The unsigned integer to be unpacked
  * @returns {Node}
  */
-export const unpackUnorm2x16 = /*@__PURE__*/ nodeProxyIntent( UnpackFloatNode, 'unorm' ).setParameterLength( 1 );
+export const unpackUnorm2x16 = /*@__PURE__*/ nodeProxyAssignable( UnpackFloatNode, 'unorm' ).setParameterLength( 1 );
 
 /**
  * Unpacks a 32-bit unsigned integer into two 16-bit values, interpreted as 16-bit floating-point numbers. Returns a vec2 with both values.
@@ -93,4 +101,24 @@ export const unpackUnorm2x16 = /*@__PURE__*/ nodeProxyIntent( UnpackFloatNode, '
  * @param {Node<uint>} value - The unsigned integer to be unpacked
  * @returns {Node}
  */
-export const unpackHalf2x16 = /*@__PURE__*/ nodeProxyIntent( UnpackFloatNode, 'float16' ).setParameterLength( 1 );
+export const unpackHalf2x16 = /*@__PURE__*/ nodeProxyAssignable( UnpackFloatNode, 'float16' ).setParameterLength( 1 );
+
+/**
+ * Unpacks a 32-bit unsigned integer into four 8-bit values, interpreted as normalized signed integers. Returns a vec4 with all values.
+ *
+ * @tsl
+ * @function
+ * @param {Node<uint>} value - The unsigned integer to be unpacked
+ * @returns {Node}
+ */
+export const unpackSnorm4x8 = /*@__PURE__*/ nodeProxyAssignable( UnpackFloatNode, 'snorm', null, { layout: '4x8' } ).setParameterLength( 1 );
+
+/**
+ * Unpacks a 32-bit unsigned integer into four 8-bit values, interpreted as normalized unsigned integers. Returns a vec4 with all values.
+ *
+ * @tsl
+ * @function
+ * @param {Node<uint>} value - The unsigned integer to be unpacked
+ * @returns {Node}
+ */
+export const unpackUnorm4x8 = /*@__PURE__*/ nodeProxyAssignable( UnpackFloatNode, 'unorm', null, { layout: '4x8' } ).setParameterLength( 1 );

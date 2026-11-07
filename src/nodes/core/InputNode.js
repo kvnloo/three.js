@@ -51,7 +51,13 @@ class InputNode extends Node {
 
 	}
 
-	getNodeType( /*builder*/ ) {
+	isCacheable( /*builder*/ ) {
+
+		return false;
+
+	}
+
+	generateNodeType( /*builder*/ ) {
 
 		if ( this.nodeType === null ) {
 

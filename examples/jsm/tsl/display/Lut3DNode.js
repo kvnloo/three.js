@@ -1,13 +1,13 @@
-import { TempNode } from 'three/webgpu';
+import { Node } from 'three/webgpu';
 import { nodeObject, Fn, float, uniform, vec3, vec4, mix } from 'three/tsl';
 
 /**
  * A post processing node for color grading via lookup tables.
  *
- * @augments TempNode
+ * @augments Node
  * @three_import import { lut3D } from 'three/addons/tsl/display/Lut3DNode.js';
  */
-class Lut3DNode extends TempNode {
+class Lut3DNode extends Node {
 
 	static get type() {
 
@@ -106,4 +106,4 @@ export default Lut3DNode;
  * @param {Node<float> | number} intensity - Controls the intensity of the effect.
  * @returns {Lut3DNode}
  */
-export const lut3D = ( node, lut, size, intensity ) => nodeObject( new Lut3DNode( nodeObject( node ), nodeObject( lut ), size, nodeObject( intensity ) ) );
+export const lut3D = ( node, lut, size, intensity ) => new Lut3DNode( nodeObject( node ), nodeObject( lut ), size, nodeObject( intensity ) );

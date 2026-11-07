@@ -1,3 +1,5 @@
+/* global THREE */ /* assigned at ./app/index.html */
+
 const APP = {
 
 	Player: function () {
@@ -12,6 +14,7 @@ const APP = {
 		const dom = document.createElement( 'div' );
 
 		this.dom = dom;
+		this.canvas = null;
 
 		this.width = 500;
 		this.height = 500;
@@ -26,18 +29,19 @@ const APP = {
 
 				renderer.dispose();
 				dom.removeChild( renderer.domElement );
+				this.canvas = null;
 
 			}
 
 			if ( project.renderer === 'WebGPURenderer' ) {
 
 				const { WebGPURenderer } = await import( 'three/webgpu' );
-				renderer = new WebGPURenderer( { antialias: true, logarithmicDepthBuffer: true } );
+				renderer = new WebGPURenderer( { antialias: true, reversedDepthBuffer: true } );
 				await renderer.init();
 
 			} else {
 
-				renderer = new THREE.WebGLRenderer( { antialias: true, logarithmicDepthBuffer: true } );
+				renderer = new THREE.WebGLRenderer( { antialias: true, reversedDepthBuffer: true } );
 
 			}
 
@@ -49,6 +53,7 @@ const APP = {
 			if ( project.toneMappingExposure !== undefined ) renderer.toneMappingExposure = project.toneMappingExposure;
 
 			dom.appendChild( renderer.domElement );
+			this.canvas = renderer.domElement;
 
 			this.setScene( loader.parse( json.scene ) );
 			this.setCamera( loader.parse( json.camera ) );
@@ -77,7 +82,7 @@ const APP = {
 
 			const scriptWrapResult = JSON.stringify( scriptWrapResultObj ).replace( /\"/g, '' );
 
-			for ( let uuid in json.scripts ) {
+			for ( const uuid in json.scripts ) {
 
 				const object = scene.getObjectByProperty( 'uuid', uuid, true );
 
@@ -96,7 +101,7 @@ const APP = {
 
 					const functions = ( new Function( scriptWrapParams, script.source + '\nreturn ' + scriptWrapResult + ';' ).bind( object ) )( this, renderer, scene, camera );
 
-					for ( let name in functions ) {
+					for ( const name in functions ) {
 
 						if ( functions[ name ] === undefined ) continue;
 
@@ -122,8 +127,7 @@ const APP = {
 		this.setCamera = function ( value ) {
 
 			camera = value;
-			camera.aspect = this.width / this.height;
-			camera.updateProjectionMatrix();
+			setCameraAspect( camera, this.width / this.height );
 
 		};
 
@@ -139,6 +143,12 @@ const APP = {
 
 		};
 
+		this.setClearColor = function ( color ) {
+
+			renderer.setClearColor( color );
+
+		};
+
 		this.setSize = function ( width, height ) {
 
 			this.width = width;
@@ -146,8 +156,7 @@ const APP = {
 
 			if ( camera ) {
 
-				camera.aspect = this.width / this.height;
-				camera.updateProjectionMatrix();
+				setCameraAspect( camera, this.width / this.height );
 
 			}
 
@@ -158,6 +167,25 @@ const APP = {
 			}
 
 		};
+
+		function setCameraAspect( camera, aspect ) {
+
+			if ( camera.isPerspectiveCamera ) {
+
+				camera.aspect = aspect;
+
+			} else {
+
+				const frustumHeight = camera.top - camera.bottom;
+
+				camera.left = - frustumHeight * aspect / 2;
+				camera.right = frustumHeight * aspect / 2;
+
+			}
+
+			camera.updateProjectionMatrix();
+
+		}
 
 		function dispatch( array, event ) {
 

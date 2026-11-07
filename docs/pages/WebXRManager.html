@@ -77,6 +77,8 @@ of the active XR session. For each view it holds a separate camera object.</p>
 <p>The camera's <code>fov</code> is currently not used and does not reflect the fov of
 the XR camera. If you need the fov on app level, you have to compute in
 manually from the XR camera's projection matrices.</p>
+<p>The camera's transformation and projection matrix are derived from the first
+sub camera (e.g. the left eye in a stereo setup).</p>
 						</div>
 						<dl class="details">
 							<dt class="tag-returns"><strong>Returns:</strong> The XR camera.</dt>
@@ -92,7 +94,7 @@ Only available during the current animation loop.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>xrCamera</strong>
+										<strong translate="no">xrCamera</strong>
 									</td>
 									<td class="description last">
 										<p>The camera to query.</p>
@@ -115,7 +117,7 @@ tasks like UI interaction.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>index</strong>
+										<strong translate="no">index</strong>
 									</td>
 									<td class="description last">
 										<p>The index of the controller.</p>
@@ -144,7 +146,7 @@ controller.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>index</strong>
+										<strong translate="no">index</strong>
 									</td>
 									<td class="description last">
 										<p>The index of the controller.</p>
@@ -214,7 +216,7 @@ tasks like UI interaction.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>index</strong>
+										<strong translate="no">index</strong>
 									</td>
 									<td class="description last">
 										<p>The index of the controller.</p>
@@ -262,7 +264,7 @@ tasks like UI interaction.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>value</strong>
+										<strong translate="no">value</strong>
 									</td>
 									<td class="description last">
 										<p>A number in the range <code>[0,1]</code> where <code>0</code> means no foveation (full resolution)
@@ -282,7 +284,7 @@ and <code>1</code> means maximum foveation (the edges render at lower resolution
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>value</strong>
+										<strong translate="no">value</strong>
 									</td>
 									<td class="description last">
 										<p>The framebuffer scale factor.</p>
@@ -300,7 +302,7 @@ and <code>1</code> means maximum foveation (the edges render at lower resolution
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>space</strong>
+										<strong translate="no">space</strong>
 									</td>
 									<td class="description last">
 										<p>The XR reference space.</p>
@@ -322,7 +324,7 @@ https://developer.mozilla.org/en-US/docs/Web/API/XRReferenceSpace#reference_spac
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>value</strong>
+										<strong translate="no">value</strong>
 									</td>
 									<td class="description last">
 										<p>The reference space type.</p>
@@ -342,7 +344,7 @@ the actual XR rendering.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>value</strong>
+										<strong translate="no">value</strong>
 									</td>
 									<td class="description last">
 										<p>The XR session to set.</p>
@@ -367,7 +369,7 @@ this method.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>camera</strong>
+										<strong translate="no">camera</strong>
 									</td>
 									<td class="description last">
 										<p>The camera.</p>

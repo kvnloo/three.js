@@ -1,8 +1,11 @@
 import { Matrix3 } from '../../math/Matrix3.js';
+import { Matrix4 } from '../../math/Matrix4.js';
 import { Plane } from '../../math/Plane.js';
 import { Vector4 } from '../../math/Vector4.js';
 
 const _plane = /*@__PURE__*/ new Plane();
+
+let _clippingContextId = 0;
 
 /**
  * Represents the state that is used to perform clipping via clipping planes.
@@ -20,6 +23,14 @@ class ClippingContext {
 	 * @param {?ClippingContext} [parentContext=null] - A reference to the parent clipping context.
 	 */
 	constructor( parentContext = null ) {
+
+		/**
+		 * The id of the clipping context.
+		 *
+		 * @type {number}
+		 * @readonly
+		 */
+		this.id = _clippingContextId ++;
 
 		/**
 		 * The clipping context's version.
@@ -51,6 +62,13 @@ class ClippingContext {
 		 * @default false
 		 */
 		this.shadowPass = false;
+
+		/**
+		 * The view matrix.
+		 *
+		 * @type {Matrix4}
+		 */
+		this.viewMatrix = new Matrix4();
 
 		/**
 		 * The view normal matrix.
@@ -90,11 +108,11 @@ class ClippingContext {
 
 		if ( parentContext !== null ) {
 
+			this.viewMatrix = parentContext.viewMatrix;
 			this.viewNormalMatrix = parentContext.viewNormalMatrix;
 			this.clippingGroupContexts = parentContext.clippingGroupContexts;
 
 			this.shadowPass = parentContext.shadowPass;
-			this.viewMatrix = parentContext.viewMatrix;
 
 		}
 
@@ -137,7 +155,18 @@ class ClippingContext {
 	updateGlobal( scene, camera ) {
 
 		this.shadowPass = ( scene.overrideMaterial !== null && scene.overrideMaterial.isShadowPassMaterial );
-		this.viewMatrix = camera.matrixWorldInverse;
+
+		if ( camera.isArrayCamera === true ) {
+
+			// ArrayCamera sub-cameras share the planes, so keep them in world space.
+
+			this.viewMatrix.identity();
+
+		} else {
+
+			this.viewMatrix.copy( camera.matrixWorldInverse );
+
+		}
 
 		this.viewNormalMatrix.getNormalMatrix( this.viewMatrix );
 
@@ -214,7 +243,7 @@ class ClippingContext {
 		if ( update ) {
 
 			this.version ++;
-			this.cacheKey = `${ this.intersectionPlanes.length }:${ this.unionPlanes.length }`;
+			this.cacheKey = `${ this.id }:${ this.intersectionPlanes.length }:${ this.unionPlanes.length }`;
 
 		}
 

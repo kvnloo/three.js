@@ -10,16 +10,20 @@ class Value extends EventDispatcher {
 		this.domElement.className = 'param-control';
 
 		this._onChangeFunction = null;
+		this._changeTimeout = null;
+		this._debounceTime = 0;
 
 		this.addEventListener( 'change', ( e ) => {
 
 			// defer to avoid issues when changing multiple values in the same call stack
 
-			requestAnimationFrame( () => {
+			clearTimeout( this._changeTimeout );
+
+			this._changeTimeout = setTimeout( () => {
 
 				if ( this._onChangeFunction ) this._onChangeFunction( e.value );
 
-			} );
+			}, this._debounceTime );
 
 		} );
 
@@ -48,6 +52,30 @@ class Value extends EventDispatcher {
 	onChange( callback ) {
 
 		this._onChangeFunction = callback;
+
+		return this;
+
+	}
+
+	debounce( time ) {
+
+		this._debounceTime = time;
+
+		return this;
+
+	}
+
+	show() {
+
+		this.dispatchEvent( { type: 'show' } );
+
+		return this;
+
+	}
+
+	hide() {
+
+		this.dispatchEvent( { type: 'hide' } );
 
 		return this;
 
@@ -99,19 +127,44 @@ class ValueNumber extends Value {
 
 	addDragHandler() {
 
+		const threshold = 2;
+
+		let isPressed = false;
 		let isDragging = false;
-		let startY, startValue;
+		let startX, startY, startValue;
 
-		this.input.addEventListener( 'mousedown', ( e ) => {
+		this.input.style.touchAction = 'none';
 
-			isDragging = true;
+		this.input.addEventListener( 'pointerdown', ( e ) => {
+
+			isPressed = true;
+			startX = e.clientX;
 			startY = e.clientY;
 			startValue = parseFloat( this.input.value );
-			document.body.style.cursor = 'ns-resize';
 
 		} );
 
-		document.addEventListener( 'mousemove', ( e ) => {
+		document.addEventListener( 'pointermove', ( e ) => {
+
+			if ( isPressed ) {
+
+				// start dragging only after a vertical movement, a horizontal one selects text
+
+				if ( Math.abs( e.clientY - startY ) > threshold ) {
+
+					isPressed = false;
+					isDragging = true;
+					startY = e.clientY;
+					this.input.blur();
+					document.body.style.cursor = 'ns-resize';
+
+				} else if ( Math.abs( e.clientX - startX ) > threshold ) {
+
+					isPressed = false;
+
+				}
+
+			}
 
 			if ( isDragging ) {
 
@@ -144,7 +197,9 @@ class ValueNumber extends Value {
 
 		} );
 
-		document.addEventListener( 'mouseup', () => {
+		document.addEventListener( 'pointerup', () => {
+
+			isPressed = false;
 
 			if ( isDragging ) {
 
@@ -204,7 +259,7 @@ class ValueCheckbox extends Value {
 
 	setValue( val ) {
 
-		this.checkbox.value = val;
+		this.checkbox.checked = val;
 
 		return super.setValue( val );
 
@@ -276,6 +331,7 @@ class ValueSlider extends Value {
 
 		this.slider.step = value;
 		this.numberInput.step = value;
+		this.slider.value = parseFloat( this.numberInput.value );
 
 		return this;
 
@@ -327,6 +383,32 @@ class ValueSelect extends Value {
 
 		this.options = options;
 		this.select = select;
+
+	}
+
+	setValue( val ) {
+
+		if ( Array.isArray( this.options ) ) {
+
+			this.select.value = val;
+
+		} else {
+
+			const entry = Object.entries( this.options ).find( ( [ , v ] ) => v === val );
+
+			if ( entry ) {
+
+				this.select.value = entry[ 0 ];
+
+			} else {
+
+				this.select.value = val;
+
+			}
+
+		}
+
+		return super.setValue( val );
 
 	}
 
@@ -383,9 +465,29 @@ class ValueColor extends Value {
 
 	}
 
+	setValue( val ) {
+
+		const colorHex = this._getColorHex( val );
+
+		this.colorInput.value = colorHex;
+
+		if ( this._value && this._value.isColor ) {
+
+			this._value.setHex( parseInt( colorHex.slice( 1 ), 16 ) );
+
+		} else {
+
+			this._value = val;
+
+		}
+
+		return super.setValue( val );
+
+	}
+
 	_getColorHex( color ) {
 
-		if ( color.isColor ) {
+		if ( color && color.isColor ) {
 
 			color = color.getHex();
 
@@ -393,9 +495,9 @@ class ValueColor extends Value {
 
 		if ( typeof color === 'number' ) {
 
-			color = `#${ color.toString( 16 ) }`;
+			color = '#' + color.toString( 16 ).padStart( 6, '0' );
 
-		} else if ( color[ 0 ] !== '#' ) {
+		} else if ( typeof color === 'string' && color[ 0 ] !== '#' ) {
 
 			color = '#' + color;
 
@@ -436,4 +538,41 @@ class ValueButton extends Value {
 
 }
 
-export { Value, ValueNumber, ValueCheckbox, ValueSlider, ValueSelect, ValueColor, ValueButton };
+class ValueString extends Value {
+
+	constructor( { value = '' } ) {
+
+		super();
+
+		const input = document.createElement( 'input' );
+		input.type = 'text';
+		input.value = value;
+		this.input = input;
+
+		input.addEventListener( 'input', () => {
+
+			this.dispatchChange();
+
+		} );
+
+		this.domElement.appendChild( input );
+
+	}
+
+	setValue( val ) {
+
+		this.input.value = val;
+
+		return super.setValue( val );
+
+	}
+
+	getValue() {
+
+		return this.input.value;
+
+	}
+
+}
+
+export { Value, ValueNumber, ValueString, ValueCheckbox, ValueSlider, ValueSelect, ValueColor, ValueButton };

@@ -1,7 +1,7 @@
 import TextureNode from './TextureNode.js';
 import { nodeProxy, vec3, Fn, If } from '../tsl/TSLBase.js';
 
-const normal = Fn( ( { texture, uv } ) => {
+const normal = /*@__PURE__*/ Fn( ( { texture, uv } ) => {
 
 	const epsilon = 0.0001;
 
@@ -141,10 +141,12 @@ class Texture3DNode extends TextureNode {
 	}
 
 	/**
-	 * TODO.
+	 * Computes the normal for the given uv. These texture coordiantes represent a
+	 * position inside the 3D texture. Unlike geometric normals, this normal
+	 * represents a slope or gradient of scalar data inside the 3D texture.
 	 *
-	 * @param {Node<vec3>} uvNode - The uv node .
-	 * @return {Node<vec3>} TODO.
+	 * @param {Node<vec3>} uvNode - The uv node that defines a position in the 3D texture.
+	 * @return {Node<vec3>} The normal representing the slope/gradient in the data.
 	 */
 	normal( uvNode ) {
 

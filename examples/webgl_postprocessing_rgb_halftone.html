@@ -4,6 +4,10 @@
 		<title>three.js webgl - postprocessing RGB Halftone</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<meta property="og:title" content="three.js webgl - postprocessing RGB Halftone">
+		<meta property="og:type" content="website">
+		<meta property="og:url" content="https://threejs.org/examples/webgl_postprocessing_rgb_halftone.html">
+		<meta property="og:image" content="https://threejs.org/examples/screenshots/webgl_postprocessing_rgb_halftone.jpg">
 		<link type="text/css" rel="stylesheet" href="main.css">
 	</head>
 	<body>
@@ -179,7 +183,7 @@
 				}
 
 				const gui = new GUI();
-				gui.add( controller, 'shape', { 'Dot': 1, 'Ellipse': 2, 'Line': 3, 'Square': 4 } ).onChange( onGUIChange );
+				gui.add( controller, 'shape', { 'Dot': 1, 'Ellipse': 2, 'Line': 3, 'Square': 4, 'Diamond': 5 } ).onChange( onGUIChange );
 				gui.add( controller, 'radius', 1, 25 ).onChange( onGUIChange );
 				gui.add( controller, 'rotateR', 0, 90 ).onChange( onGUIChange );
 				gui.add( controller, 'rotateG', 0, 90 ).onChange( onGUIChange );

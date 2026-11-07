@@ -32,7 +32,7 @@ part of the viewport that is rendered with this camera.</p></div>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>array</strong>
+										<strong translate="no">array</strong>
 									</td>
 									<td class="description last">
 										<p>An array of perspective sub cameras.</p>
@@ -61,6 +61,16 @@ part of the viewport that is rendered with this camera.</p></div>
 					<h3 class="name" id="isMultiViewCamera" translate="no">.<a href="#isMultiViewCamera">isMultiViewCamera</a><span class="type-signature"> : boolean</span> <span class="type-signature">(readonly) </span></h3>
 					<div class="description">
 						<p>Whether this camera is used with multiview rendering or not.</p>
+						<p>Default is <code>false</code>.</p>
+					</div>
+				</div>
+				<div class="member">
+					<h3 class="name" id="perCameraFrustumCulled" translate="no">.<a href="#perCameraFrustumCulled">perCameraFrustumCulled</a><span class="type-signature"> : boolean</span> </h3>
+					<div class="description">
+						<p>Whether 3D objects are frustum culled per sub camera or not.</p>
+<p>Since this requires an additional frustum test per sub camera, it should only be
+enabled when the frustums of the sub cameras barely overlap. The property has
+no effect with multiview rendering.</p>
 						<p>Default is <code>false</code>.</p>
 					</div>
 				</div>

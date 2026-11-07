@@ -70,12 +70,18 @@ class Object3DNode extends Node {
 
 	}
 
+	isCacheable( /*builder*/ ) {
+
+		return false;
+
+	}
+
 	/**
 	 * Overwritten since the node type is inferred from the scope.
 	 *
 	 * @return {('mat4'|'vec3'|'float')} The node type.
 	 */
-	getNodeType() {
+	generateNodeType() {
 
 		const scope = this.scope;
 

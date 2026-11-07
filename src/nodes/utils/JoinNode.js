@@ -1,4 +1,4 @@
-import TempNode from '../core/TempNode.js';
+import Node from '../core/Node.js';
 import { error } from '../../utils.js';
 
 /**
@@ -6,9 +6,9 @@ import { error } from '../../utils.js';
  * It represents a join operation during the shader generation process.
  * For example in can compose/join two single floats into a `vec2` type.
  *
- * @augments TempNode
+ * @augments Node
  */
-class JoinNode extends TempNode {
+class JoinNode extends Node {
 
 	static get type() {
 
@@ -42,7 +42,7 @@ class JoinNode extends TempNode {
 	 * @param {NodeBuilder} builder - The current node builder.
 	 * @return {string} The node type.
 	 */
-	getNodeType( builder ) {
+	generateNodeType( builder ) {
 
 		if ( this.nodeType !== null ) {
 
@@ -71,7 +71,7 @@ class JoinNode extends TempNode {
 
 			if ( length >= maxLength ) {
 
-				error( `TSL: Length of parameters exceeds maximum length of function '${ type }()' type.` );
+				error( `TSL: Length of parameters exceeds maximum length of function '${ type }()' type.`, this.stackTrace );
 				break;
 
 			}
@@ -82,7 +82,7 @@ class JoinNode extends TempNode {
 
 			if ( length + inputTypeLength > maxLength ) {
 
-				error( `TSL: Length of '${ type }()' data exceeds maximum length of output type.` );
+				error( `TSL: Length of '${ type }()' data exceeds maximum length of output type.`, this.stackTrace );
 
 				inputTypeLength = maxLength - length;
 				inputType = builder.getTypeFromLength( inputTypeLength );

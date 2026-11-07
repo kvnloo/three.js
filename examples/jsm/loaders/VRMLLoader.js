@@ -80,6 +80,8 @@ class VRMLLoader extends Loader {
 		const path = ( scope.path === '' ) ? LoaderUtils.extractUrlBase( url ) : scope.path;
 
 		const loader = new FileLoader( scope.manager );
+		loader.setPriority( scope.priority );
+		loader.setCache( scope.cache );
 		loader.setPath( scope.path );
 		loader.setRequestHeader( scope.requestHeader );
 		loader.setWithCredentials( scope.withCredentials );
@@ -220,7 +222,7 @@ class VRMLLoader extends Loader {
 
 			//
 
-			const StringLiteral = createToken( { name: 'StringLiteral', pattern: /"(?:[^\\"\n\r]|\\[bfnrtv"\\/]|\\u[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F])*"/ } );
+			const StringLiteral = createToken( { name: 'StringLiteral', pattern: /"(?:[^\\"]|\\[bfnrtv"\\/]|\\u[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F])*"/ } );
 			const HexLiteral = createToken( { name: 'HexLiteral', pattern: /0[xX][0-9a-fA-F]+/ } );
 			const NumberLiteral = createToken( { name: 'NumberLiteral', pattern: /[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?/ } );
 			const TrueLiteral = createToken( { name: 'TrueLiteral', pattern: /TRUE/ } );
@@ -3338,6 +3340,8 @@ class VRMLLoader extends Loader {
 		//
 
 		const textureLoader = new TextureLoader( this.manager );
+		textureLoader.setPriority( this.priority );
+		textureLoader.setCache( this.cache );
 		textureLoader.setPath( this.resourcePath || path ).setCrossOrigin( this.crossOrigin );
 
 		// check version (only 2.0 is supported)

@@ -50,6 +50,24 @@ class MemberNode extends Node {
 
 	}
 
+	isCacheable( /*builder*/ ) {
+
+		return false;
+
+	}
+
+	/**
+	 * Returns the scope of the struct so assignments to members
+	 * mark the underlying value as mutable.
+	 *
+	 * @return {Node} The scope of the node.
+	 */
+	getScope() {
+
+		return this.structNode.getScope();
+
+	}
+
 	hasMember( builder ) {
 
 		if ( this.structNode.isMemberNode ) {
@@ -66,7 +84,7 @@ class MemberNode extends Node {
 
 	}
 
-	getNodeType( builder ) {
+	generateNodeType( builder ) {
 
 		if ( this.hasMember( builder ) === false ) {
 
@@ -101,7 +119,7 @@ class MemberNode extends Node {
 
 		if ( this.hasMember( builder ) === false ) {
 
-			warn( `TSL: Member "${ this.property }" does not exist in struct.` );
+			warn( `TSL: Member "${ this.property }" does not exist in struct.`, this.stackTrace );
 
 			const type = this.getNodeType( builder );
 

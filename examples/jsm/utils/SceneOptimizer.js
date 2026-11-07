@@ -110,7 +110,8 @@ class SceneOptimizer {
 			'ior',
 			'iridescence',
 			'iridescenceIOR',
-			'iridescenceThicknessRange',
+			'iridescenceThicknessMinimum',
+			'iridescenceThicknessMaximum',
 			'reflectivity',
 		]
 			.map( ( prop ) => {
@@ -442,7 +443,7 @@ class SceneOptimizer {
 	 */
 	toInstancingMesh() {
 
-		throw new Error( 'InstancedMesh optimization not implemented yet' );
+		throw new Error( 'THREE.SceneOptimizer: InstancedMesh optimization not implemented yet' );
 
 	}
 

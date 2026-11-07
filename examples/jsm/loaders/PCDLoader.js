@@ -67,6 +67,8 @@ class PCDLoader extends Loader {
 		const scope = this;
 
 		const loader = new FileLoader( scope.manager );
+		loader.setPriority( scope.priority );
+		loader.setCache( scope.cache );
 		loader.setPath( scope.path );
 		loader.setResponseType( 'arraybuffer' );
 		loader.setRequestHeader( scope.requestHeader );
@@ -188,8 +190,8 @@ class PCDLoader extends Loader {
 				if ( ctrl < ( 1 << 5 ) ) {
 
 					ctrl ++;
-					if ( outPtr + ctrl > outLength ) throw new Error( 'Output buffer is not large enough' );
-					if ( inPtr + ctrl > inLength ) throw new Error( 'Invalid compressed data' );
+					if ( outPtr + ctrl > outLength ) throw new Error( 'THREE.PCDLoader: Output buffer is not large enough' );
+					if ( inPtr + ctrl > inLength ) throw new Error( 'THREE.PCDLoader: Invalid compressed data' );
 					do {
 
 						outData[ outPtr ++ ] = inData[ inPtr ++ ];
@@ -200,18 +202,18 @@ class PCDLoader extends Loader {
 
 					len = ctrl >> 5;
 					ref = outPtr - ( ( ctrl & 0x1f ) << 8 ) - 1;
-					if ( inPtr >= inLength ) throw new Error( 'Invalid compressed data' );
+					if ( inPtr >= inLength ) throw new Error( 'THREE.PCDLoader: Invalid compressed data' );
 					if ( len === 7 ) {
 
 						len += inData[ inPtr ++ ];
-						if ( inPtr >= inLength ) throw new Error( 'Invalid compressed data' );
+						if ( inPtr >= inLength ) throw new Error( 'THREE.PCDLoader: Invalid compressed data' );
 
 					}
 
 					ref -= inData[ inPtr ++ ];
-					if ( outPtr + len + 2 > outLength ) throw new Error( 'Output buffer is not large enough' );
-					if ( ref < 0 ) throw new Error( 'Invalid compressed data' );
-					if ( ref >= outPtr ) throw new Error( 'Invalid compressed data' );
+					if ( outPtr + len + 2 > outLength ) throw new Error( 'THREE.PCDLoader: Output buffer is not large enough' );
+					if ( ref < 0 ) throw new Error( 'THREE.PCDLoader: Invalid compressed data' );
+					if ( ref >= outPtr ) throw new Error( 'THREE.PCDLoader: Invalid compressed data' );
 					do {
 
 						outData[ outPtr ++ ] = outData[ ref ++ ];
@@ -269,7 +271,7 @@ class PCDLoader extends Loader {
 
 			// remove comments
 
-			PCDheader.str = PCDheader.str.replace( /#.*/gi, '' );
+			PCDheader.str = PCDheader.str.replace( /^#.*/gm, '' );
 
 			// parse
 
@@ -341,12 +343,14 @@ class PCDLoader extends Loader {
 			PCDheader.offset = {};
 
 			let sizeSum = 0;
+			let countSum = 0;
 
 			for ( let i = 0, l = PCDheader.fields.length; i < l; i ++ ) {
 
 				if ( PCDheader.data === 'ascii' ) {
 
-					PCDheader.offset[ PCDheader.fields[ i ] ] = i;
+					PCDheader.offset[ PCDheader.fields[ i ] ] = countSum;
+					countSum += PCDheader.count[ i ];
 
 				} else {
 
@@ -392,7 +396,7 @@ class PCDLoader extends Loader {
 
 				if ( lines[ i ] === '' ) continue;
 
-				const line = lines[ i ].split( ' ' );
+				const line = lines[ i ].trim().split( /\s+/ );
 
 				if ( offset.x !== undefined ) {
 

@@ -1,5 +1,4 @@
 import Node from '../core/Node.js';
-import { reference } from './ReferenceNode.js';
 import { materialReference } from './MaterialReferenceNode.js';
 import { normalView } from './Normal.js';
 import { nodeImmutable, float, vec2, vec3, mat2 } from '../tsl/TSLBase.js';
@@ -43,6 +42,12 @@ class MaterialNode extends Node {
 		 * @type {string}
 		 */
 		this.scope = scope;
+
+	}
+
+	isCacheable( /*builder*/ ) {
+
+		return false;
 
 	}
 
@@ -201,6 +206,20 @@ class MaterialNode extends Node {
 
 			}
 
+		} else if ( scope === MaterialNode.DIFFUSE_ROUGHNESS ) {
+
+			const diffuseRoughnessNode = this.getFloat( scope );
+
+			if ( material.diffuseRoughnessMap && material.diffuseRoughnessMap.isTexture === true ) {
+
+				node = diffuseRoughnessNode.mul( this.getTexture( scope ).r );
+
+			} else {
+
+				node = diffuseRoughnessNode;
+
+			}
+
 		} else if ( scope === MaterialNode.METALNESS ) {
 
 			const metalnessNode = this.getFloat( scope );
@@ -273,7 +292,7 @@ class MaterialNode extends Node {
 
 			if ( material.clearcoatRoughnessMap && material.clearcoatRoughnessMap.isTexture === true ) {
 
-				node = clearcoatRoughnessNode.mul( this.getTexture( scope ).r );
+				node = clearcoatRoughnessNode.mul( this.getTexture( scope ).g );
 
 			} else {
 
@@ -340,11 +359,11 @@ class MaterialNode extends Node {
 
 		} else if ( scope === MaterialNode.IRIDESCENCE_THICKNESS ) {
 
-			const iridescenceThicknessMaximum = reference( '1', 'float', material.iridescenceThicknessRange );
+			const iridescenceThicknessMaximum = this.getFloat( 'iridescenceThicknessMaximum' );
 
 			if ( material.iridescenceThicknessMap ) {
 
-				const iridescenceThicknessMinimum = reference( '0', 'float', material.iridescenceThicknessRange );
+				const iridescenceThicknessMinimum = this.getFloat( 'iridescenceThicknessMinimum' );
 
 				node = iridescenceThicknessMaximum.sub( iridescenceThicknessMinimum ).mul( this.getTexture( scope ).g ).add( iridescenceThicknessMinimum );
 
@@ -388,11 +407,27 @@ class MaterialNode extends Node {
 
 		} else if ( scope === MaterialNode.LIGHT_MAP ) {
 
-			node = this.getTexture( scope ).rgb.mul( this.getFloat( 'lightMapIntensity' ) );
+			if ( material.lightMap ) {
+
+				node = this.getTexture( scope ).rgb.mul( this.getFloat( 'lightMapIntensity' ) );
+
+			} else {
+
+				node = vec3( 0.0 );
+
+			}
 
 		} else if ( scope === MaterialNode.AO ) {
 
-			node = this.getTexture( scope ).r.sub( 1.0 ).mul( this.getFloat( 'aoMapIntensity' ) ).add( 1.0 );
+			if ( material.aoMap ) {
+
+				node = this.getTexture( scope ).r.sub( 1.0 ).mul( this.getFloat( 'aoMapIntensity' ) ).add( 1.0 );
+
+			} else {
+
+				node = float( 1.0 );
+
+			}
 
 		} else if ( scope === MaterialNode.LINE_DASH_OFFSET ) {
 
@@ -422,6 +457,7 @@ MaterialNode.SPECULAR_INTENSITY = 'specularIntensity';
 MaterialNode.SPECULAR_COLOR = 'specularColor';
 MaterialNode.REFLECTIVITY = 'reflectivity';
 MaterialNode.ROUGHNESS = 'roughness';
+MaterialNode.DIFFUSE_ROUGHNESS = 'diffuseRoughness';
 MaterialNode.METALNESS = 'metalness';
 MaterialNode.NORMAL = 'normal';
 MaterialNode.CLEARCOAT = 'clearcoat';
@@ -447,6 +483,7 @@ MaterialNode.LINE_WIDTH = 'linewidth';
 MaterialNode.LINE_DASH_OFFSET = 'dashOffset';
 MaterialNode.POINT_SIZE = 'size';
 MaterialNode.DISPERSION = 'dispersion';
+MaterialNode.RETROREFLECTIVITY = 'retroreflectivity';
 MaterialNode.LIGHT_MAP = 'light';
 MaterialNode.AO = 'ao';
 
@@ -546,6 +583,15 @@ export const materialReflectivity = /*@__PURE__*/ nodeImmutable( MaterialNode, M
  * @type {Node<float>}
  */
 export const materialRoughness = /*@__PURE__*/ nodeImmutable( MaterialNode, MaterialNode.ROUGHNESS );
+
+/**
+ * TSL object that represents the diffuse roughness of the current material.
+ * The value is composed via `diffuseRoughness` * `diffuseRoughnessMap.r`.
+ *
+ * @tsl
+ * @type {Node<float>}
+ */
+export const materialDiffuseRoughness = /*@__PURE__*/ nodeImmutable( MaterialNode, MaterialNode.DIFFUSE_ROUGHNESS );
 
 /**
  * TSL object that represents the metalness of the current material.
@@ -747,6 +793,14 @@ export const materialPointSize = /*@__PURE__*/ nodeImmutable( MaterialNode, Mate
  * @type {Node<float>}
  */
 export const materialDispersion = /*@__PURE__*/ nodeImmutable( MaterialNode, MaterialNode.DISPERSION );
+
+/**
+ * TSL object that represents the retroreflective strength of the current material.
+ *
+ * @tsl
+ * @type {Node<float>}
+ */
+export const materialRetroreflectivity = /*@__PURE__*/ nodeImmutable( MaterialNode, MaterialNode.RETROREFLECTIVITY );
 
 /**
  * TSL object that represents the light map of the current material.

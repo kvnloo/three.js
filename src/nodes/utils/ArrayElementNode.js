@@ -6,7 +6,7 @@ import Node from '../core/Node.js';
  *
  * @augments Node
  */
-class ArrayElementNode extends Node { // @TODO: If extending from TempNode it breaks webgpu_compute
+class ArrayElementNode extends Node {
 
 	static get type() {
 
@@ -49,13 +49,31 @@ class ArrayElementNode extends Node { // @TODO: If extending from TempNode it br
 
 	}
 
+	isCacheable( /*builder*/ ) {
+
+		return false;
+
+	}
+
+	/**
+	 * Returns the scope of the array-like node so assignments to elements
+	 * mark the underlying value as mutable.
+	 *
+	 * @return {Node} The scope of the node.
+	 */
+	getScope() {
+
+		return this.node.getScope();
+
+	}
+
 	/**
 	 * This method is overwritten since the node type is inferred from the array-like node.
 	 *
 	 * @param {NodeBuilder} builder - The current node builder.
 	 * @return {string} The node type.
 	 */
-	getNodeType( builder ) {
+	generateNodeType( builder ) {
 
 		return this.node.getElementType( builder );
 

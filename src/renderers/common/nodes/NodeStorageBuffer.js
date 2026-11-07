@@ -20,7 +20,9 @@ class NodeStorageBuffer extends StorageBuffer {
 	 */
 	constructor( nodeUniform, groupNode ) {
 
-		super( 'StorageBuffer_' + _id ++, nodeUniform ? nodeUniform.value : null );
+		const label = nodeUniform && nodeUniform.name ? nodeUniform.name : _id ++;
+
+		super( 'StorageBuffer_' + label );
 
 		/**
 		 * The node uniform.

@@ -1,4 +1,4 @@
-import { RenderTarget, Vector2, QuadMesh, NodeMaterial, RendererUtils, TempNode, NodeUpdateType } from 'three/webgpu';
+import { RenderTarget, Vector2, QuadMesh, NodeMaterial, RendererUtils, Node, NodeUpdateType } from 'three/webgpu';
 import { nodeObject, Fn, float, uv, texture, passTexture, sign, max, convertToTexture } from 'three/tsl';
 
 const _size = /*@__PURE__*/ new Vector2();
@@ -9,10 +9,10 @@ let _rendererState;
 /**
  * Post processing node for creating an after image effect.
  *
- * @augments TempNode
+ * @augments Node
  * @three_import import { afterImage } from 'three/addons/tsl/display/AfterImageNode.js';
  */
-class AfterImageNode extends TempNode {
+class AfterImageNode extends Node {
 
 	static get type() {
 
@@ -79,6 +79,14 @@ class AfterImageNode extends TempNode {
 		 * @type {TextureNode}
 		 */
 		this._textureNodeOld = texture( this._oldRT.texture );
+
+		/**
+		 * The material for the composite pass.
+		 *
+		 * @private
+		 * @type {?NodeMaterial}
+		 */
+		this._materialComposed = null;
 
 		/**
 		 * The `updateBeforeType` is set to `NodeUpdateType.FRAME` since the node renders
@@ -223,8 +231,12 @@ class AfterImageNode extends TempNode {
 	 */
 	dispose() {
 
+		super.dispose();
+
 		this._compRT.dispose();
 		this._oldRT.dispose();
+
+		if ( this._materialComposed !== null ) this._materialComposed.dispose();
 
 	}
 
@@ -239,6 +251,6 @@ class AfterImageNode extends TempNode {
  * @param {(Node<float>|number)} [damp=0.96] - The damping intensity. A higher value means a stronger after image effect.
  * @returns {AfterImageNode}
  */
-export const afterImage = ( node, damp ) => nodeObject( new AfterImageNode( convertToTexture( node ), nodeObject( damp ) ) );
+export const afterImage = ( node, damp ) => new AfterImageNode( convertToTexture( node ), nodeObject( damp ) );
 
 export default AfterImageNode;

@@ -12,7 +12,16 @@ export default [
 		ignores: [
 			'**/node_modules/**',
 			'**/build/**',
-			'**/libs/**',
+			'examples/jsm/libs/**',
+			'test/treeshake/*.bundle.js',
+			'test/treeshake/*.bundle.min.js',
+			'editor/js/libs/acorn/**',
+			'editor/js/libs/codemirror/**',
+			'editor/js/libs/tern-threejs/**',
+			'editor/js/libs/ternjs/**',
+			'editor/js/libs/esprima.js',
+			'editor/js/libs/jsonlint.js',
+			'editor/js/libs/signals.min.js',
 			'**/ifc/**',
 			'**/prettify.js',
 			'**/prettify/**',
@@ -38,7 +47,7 @@ export default [
 			jsdoc
 		},
 		languageOptions: {
-			ecmaVersion: 2018,
+			ecmaVersion: 2022,
 			sourceType: 'module',
 			globals: {
 				...globals.browser,
@@ -127,8 +136,22 @@ export default [
 		name: 'editor rules',
 		files: [ 'editor/**/*.js' ],
 		languageOptions: {
-			ecmaVersion: 2020,
+			ecmaVersion: 2022,
 			sourceType: 'module'
+		}
+	},
+
+	// tests must import from src, not build
+	{
+		name: 'unit test rules',
+		files: [ 'test/unit/**/*.js' ],
+		rules: {
+			'no-restricted-imports': [ 'error', {
+				patterns: [ {
+					group: [ '**/build/*' ],
+					message: 'Tests must import from /src, not /build as build is not guaranteed to be fresh.'
+				} ]
+			} ]
 		}
 	}
 ];

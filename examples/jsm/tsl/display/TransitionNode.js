@@ -1,13 +1,13 @@
-import { TempNode } from 'three/webgpu';
+import { Node } from 'three/webgpu';
 import { nodeObject, Fn, float, uv, convertToTexture, vec4, If, int, clamp, sub, mix } from 'three/tsl';
 
 /**
  * Post processing node for creating a transition effect between scenes.
  *
- * @augments TempNode
+ * @augments Node
  * @three_import import { transition } from 'three/addons/tsl/display/TransitionNode.js';
  */
-class TransitionNode extends TempNode {
+class TransitionNode extends Node {
 
 	static get type() {
 
@@ -138,4 +138,4 @@ export default TransitionNode;
  * @param {Node<float> | number} useTexture - Whether `mixTextureNode` should influence the transition or not.
  * @returns {TransitionNode}
  */
-export const transition = ( nodeA, nodeB, mixTextureNode, mixRatio, threshold, useTexture ) => nodeObject( new TransitionNode( convertToTexture( nodeA ), convertToTexture( nodeB ), convertToTexture( mixTextureNode ), nodeObject( mixRatio ), nodeObject( threshold ), nodeObject( useTexture ) ) );
+export const transition = ( nodeA, nodeB, mixTextureNode, mixRatio, threshold, useTexture ) => new TransitionNode( convertToTexture( nodeA ), convertToTexture( nodeB ), convertToTexture( mixTextureNode ), nodeObject( mixRatio ), nodeObject( threshold ), nodeObject( useTexture ) );

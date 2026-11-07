@@ -108,6 +108,7 @@ class SVGRenderer {
 			_clearColor = new Color(),
 
 			_vector3 = new Vector3(), // Needed for PointLight
+			_vector3b = new Vector3(), // Needed for DirectionalLight
 			_centroid = new Vector3(),
 			_normal = new Vector3(),
 			_normalViewMatrix = new Matrix3(),
@@ -300,29 +301,6 @@ class SVGRenderer {
 
 		}
 
-		function arraySortStable( array, start, length ) {
-
-			// A stable insertion sort for sorting the render list
-			// This avoids the GC overhead of Array.prototype.sort()
-
-			for ( let i = start + 1; i < start + length; i ++ ) {
-
-				const item = array[ i ];
-				let j = i - 1;
-
-				while ( j >= start && renderSort( array[ j ], item ) > 0 ) {
-
-					array[ j + 1 ] = array[ j ];
-					j --;
-
-				}
-
-				array[ j + 1 ] = item;
-
-			}
-
-		}
-
 		/**
 		 * Performs a manual clear with the defined clear color.
 		 */
@@ -416,9 +394,13 @@ class SVGRenderer {
 
 			} );
 
-			if ( this.sortElements ) {
+			_renderListPool.length = _renderListCount;
 
-				arraySortStable( _renderListPool, 0, _renderListCount );
+			if ( this.sortElements && _svgObjectCount > 0 ) {
+
+				// Elements are already sorted by the Projector.
+				// Only re-sort when SVGObjects need depth-interleaving.
+				_renderListPool.sort( renderSort );
 
 			}
 
@@ -551,9 +533,9 @@ class SVGRenderer {
 
 				if ( light.isDirectionalLight ) {
 
-					const lightPosition = _vector3.setFromMatrixPosition( light.matrixWorld ).normalize();
+					const lightDirection = _vector3.setFromMatrixPosition( light.matrixWorld ).sub( _vector3b.setFromMatrixPosition( light.target.matrixWorld ) ).normalize();
 
-					let amount = normal.dot( lightPosition );
+					let amount = normal.dot( lightDirection );
 
 					if ( amount <= 0 ) continue;
 

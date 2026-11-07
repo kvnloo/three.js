@@ -76,6 +76,17 @@ light data into the cache key.</p>
 							<dt class="tag-returns"><strong>Returns:</strong> The custom cache key.</dt>
 						</dl>
 					</div>
+					<h3 class="name name-method" id="getBuiltinLights" translate="no">.<a href="#getBuiltinLights">getBuiltinLights</a><span class="signature">()</span><span class="type-signature"> : Array.&lt;<a href="Light.html">Light</a>></span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Returns an array of the scene's lights.</p>
+<p>The light variations are shader-dependent;
+if this array changes, the shader needs to be recreated.</p>
+						</div>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The scene's lights.</dt>
+						</dl>
+					</div>
 					<h3 class="name name-method" id="getHash" translate="no">.<a href="#getHash">getHash</a><span class="signature">( builder : <span class="param-type"><a href="NodeBuilder.html">NodeBuilder</a></span> )</span><span class="type-signature"> : string</span> </h3>
 					<div class="method">
 						<div class="description">
@@ -85,7 +96,7 @@ light data into the cache key.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>A reference to the current node builder.</p>
@@ -118,7 +129,7 @@ light data into the cache key.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>lights</strong>
+										<strong translate="no">lights</strong>
 									</td>
 									<td class="description last">
 										<p>An array of lights.</p>
@@ -141,7 +152,7 @@ and evaluating the lighting model the outgoing light is computed.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>A reference to the current node builder.</p>
@@ -165,7 +176,7 @@ and evaluating the lighting model the outgoing light is computed.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>The builder object containing the context and stack.</p>
@@ -173,7 +184,7 @@ and evaluating the lighting model the outgoing light is computed.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>lightNode</strong>
+										<strong translate="no">lightNode</strong>
 									</td>
 									<td class="description last">
 										<p>The light node.</p>
@@ -181,10 +192,44 @@ and evaluating the lighting model the outgoing light is computed.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>lightData</strong>
+										<strong translate="no">lightData</strong>
 									</td>
 									<td class="description last">
 										<p>The light object containing color and direction properties.</p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+					<h3 class="name name-method" id="setupDirectRectAreaLight" translate="no">.<a href="#setupDirectRectAreaLight">setupDirectRectAreaLight</a><span class="signature">( builder : <span class="param-type">Object</span>, lightNode : <span class="param-type">Object</span>, lightData : <span class="param-type">Object</span> )</span> </h3>
+					<div class="method">
+						<div class="description">
+							<p>Sets up a direct rect area light in the lighting model.</p>
+						</div>
+						<table class="params">
+							<tbody>
+								<tr>
+									<td class="name">
+										<strong translate="no">builder</strong>
+									</td>
+									<td class="description last">
+										<p>The builder object containing the context and stack.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">lightNode</strong>
+									</td>
+									<td class="description last">
+										<p>The light node.</p>
+									</td>
+								</tr>
+								<tr>
+									<td class="name">
+										<strong translate="no">lightData</strong>
+									</td>
+									<td class="description last">
+										<p>The light object containing color and area light properties.</p>
 									</td>
 								</tr>
 							</tbody>
@@ -200,7 +245,7 @@ light nodes.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>A reference to the current node builder.</p>
@@ -208,7 +253,7 @@ light nodes.</p>
 								</tr>
 								<tr>
 									<td class="name">
-										<strong>lightNodes</strong>
+										<strong translate="no">lightNodes</strong>
 									</td>
 									<td class="description last">
 										<p>An array of lighting nodes.</p>
@@ -217,7 +262,7 @@ light nodes.</p>
 							</tbody>
 						</table>
 					</div>
-					<h3 class="name name-method" id="setupLightsNode" translate="no">.<a href="#setupLightsNode">setupLightsNode</a><span class="signature">( builder : <span class="param-type"><a href="NodeBuilder.html">NodeBuilder</a></span> )</span> </h3>
+					<h3 class="name name-method" id="setupLightsNode" translate="no">.<a href="#setupLightsNode">setupLightsNode</a><span class="signature">( builder : <span class="param-type"><a href="NodeBuilder.html">NodeBuilder</a></span> )</span><span class="type-signature"> : Array.&lt;<a href="LightingNode.html">LightingNode</a>></span> </h3>
 					<div class="method">
 						<div class="description">
 							<p>Creates lighting nodes for each scene light. This makes it possible to further
@@ -227,7 +272,7 @@ process lights in the node system.</p>
 							<tbody>
 								<tr>
 									<td class="name">
-										<strong>builder</strong>
+										<strong translate="no">builder</strong>
 									</td>
 									<td class="description last">
 										<p>A reference to the current node builder.</p>
@@ -235,6 +280,9 @@ process lights in the node system.</p>
 								</tr>
 							</tbody>
 						</table>
+						<dl class="details">
+							<dt class="tag-returns"><strong>Returns:</strong> The array of lighting nodes.</dt>
+						</dl>
 					</div>
 				<h2 class="subsection-title">Source</h2>
 				<p>

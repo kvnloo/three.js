@@ -45,6 +45,8 @@ class NRRDLoader extends Loader {
 		const scope = this;
 
 		const loader = new FileLoader( scope.manager );
+		loader.setPriority( scope.priority );
+		loader.setCache( scope.cache );
 		loader.setPath( scope.path );
 		loader.setResponseType( 'arraybuffer' );
 		loader.setRequestHeader( scope.requestHeader );
@@ -202,7 +204,7 @@ class NRRDLoader extends Loader {
 
 					headerObject.isNrrd = true;
 
-				} else if ( ! l.match( /^#/ ) && ( m = l.match( /(.*):(.*)/ ) ) ) {
+				} else if ( ! l.match( /^#/ ) && ( m = l.match( /^(.*):(.*)/ ) ) ) {
 
 					field = m[ 1 ].trim();
 					data = m[ 2 ].trim();
@@ -223,13 +225,13 @@ class NRRDLoader extends Loader {
 
 			if ( ! headerObject.isNrrd ) {
 
-				throw new Error( 'Not an NRRD file' );
+				throw new Error( 'THREE.NRRDLoader: Not an NRRD file' );
 
 			}
 
 			if ( headerObject.encoding === 'bz2' || headerObject.encoding === 'bzip2' ) {
 
-				throw new Error( 'Bzip is not supported' );
+				throw new Error( 'THREE.NRRDLoader: Bzip is not supported' );
 
 			}
 
@@ -339,7 +341,7 @@ class NRRDLoader extends Loader {
 
 				// we found two line breaks in a row
 				// now we know what the header is
-				_header = this._parseChars( _bytes, 0, i - 2 );
+				_header = this._parseChars( _bytes, 0, i - 1 );
 				// this is were the data starts
 				_data_start = i + 1;
 				break;
@@ -598,7 +600,7 @@ const _fieldFunctions = {
 				this.__array = Float64Array;
 				break;
 			default:
-				throw new Error( 'Unsupported NRRD data type: ' + data );
+				throw new Error( 'THREE.NRRDLoader: Unsupported NRRD data type: ' + data );
 
 		}
 

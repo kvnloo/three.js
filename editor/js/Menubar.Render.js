@@ -202,14 +202,30 @@ class RenderImageDialog {
 			const loader = new THREE.ObjectLoader();
 
 			const camera = await loader.parseAsync( json.camera );
-			camera.aspect = imageWidth.getValue() / imageHeight.getValue();
+
+			const aspect = imageWidth.getValue() / imageHeight.getValue();
+
+			if ( camera.isPerspectiveCamera ) {
+
+				camera.aspect = aspect;
+
+			} else {
+
+				const frustumHeight = camera.top - camera.bottom;
+
+				camera.left = - frustumHeight * aspect / 2;
+				camera.right = frustumHeight * aspect / 2;
+
+			}
+
 			camera.updateProjectionMatrix();
 			camera.updateMatrixWorld();
 
 			const scene = await loader.parseAsync( json.scene );
 
-			const renderer = new THREE.WebGLRenderer( { antialias: true, logarithmicDepthBuffer: true } );
+			const renderer = new THREE.WebGLRenderer( { antialias: true, reversedDepthBuffer: true } );
 			renderer.setSize( imageWidth.getValue(), imageHeight.getValue() );
+			renderer.setClearColor( editor.viewportColor );
 
 			if ( project.shadows !== undefined ) renderer.shadowMap.enabled = project.shadows;
 			if ( project.shadowType !== undefined ) renderer.shadowMap.type = project.shadowType;
@@ -414,6 +430,7 @@ class RenderVideoDialog {
 			await player.load( editor.toJSON() );
 			player.setPixelRatio( 1 );
 			player.setSize( videoWidth.getValue(), videoHeight.getValue() );
+			player.setClearColor( editor.viewportColor );
 
 			//
 
@@ -497,7 +514,7 @@ class RenderVideoDialog {
 
 			const qualityToBitrate = {
 				'low': 2e6,
-				'medium': 5e6, 
+				'medium': 5e6,
 				'high': 10e6,
 				'ultra': 20e6
 			};
@@ -526,7 +543,7 @@ class RenderVideoDialog {
 				player.render( currentTime );
 
 				const bitmap = await createImageBitmap( canvas );
-				const frame = new VideoFrame( bitmap, { timestamp: i * ( 1_000_000 / fps ) } );
+				const frame = new VideoFrame( bitmap, { timestamp: i * ( 1e6 / fps ) } );
 
 				videoEncoder.encode( frame, { keyFrame: i % fps === 0 } );
 				frame.close();

@@ -1,13 +1,14 @@
-import TempNode from '../core/TempNode.js';
-import { addMethodChaining, nodeObject } from '../tsl/TSLCore.js';
+import Node from '../core/Node.js';
+import { addMethodChaining, nodeObject, vec4 } from '../tsl/TSLCore.js';
+import { premultiplyAlpha, unpremultiplyAlpha } from './PremultiplyAlphaFunctions.js';
 
 import { NoColorSpace, NoToneMapping } from '../../constants.js';
 import { ColorManagement } from '../../math/ColorManagement.js';
 
 /**
- * Normally, tone mapping and color conversion happens automatically
- * before outputting pixel too the default (screen) framebuffer. In certain
- * post processing setups this happens to late because certain effects
+ * Normally, tone mapping and color conversion happens automatically just
+ * before outputting a pixel to the default (screen) framebuffer. In certain
+ * post processing setups this is too late because some effects such as FXAA
  * require e.g. sRGB input. For such scenarios, `RenderOutputNode` can be used
  * to apply tone mapping and color space conversion at an arbitrary point
  * in the effect chain.
@@ -25,9 +26,9 @@ import { ColorManagement } from '../../math/ColorManagement.js';
  * postProcessing.outputNode = outputPass;
  * ```
  *
- * @augments TempNode
+ * @augments Node
  */
-class RenderOutputNode extends TempNode {
+class RenderOutputNode extends Node {
 
 	static get type() {
 
@@ -69,6 +70,15 @@ class RenderOutputNode extends TempNode {
 		this.outputColorSpace = outputColorSpace;
 
 		/**
+		 * Whether the color node uses premultiplied alpha. The output
+		 * uses the same alpha mode.
+		 *
+		 * @type {boolean}
+		 * @default true
+		 */
+		this.premultipliedAlpha = true;
+
+		/**
 		 * This flag can be used for type testing.
 		 *
 		 * @type {boolean}
@@ -108,9 +118,19 @@ class RenderOutputNode extends TempNode {
 
 		let outputNode = this.colorNode || context.color;
 
-		// tone mapping
+		// clamp alpha
+		outputNode = vec4( outputNode.rgb, outputNode.a.clamp( 0.0, 1.0 ) );
 
+		// unpremultiply
+		if ( this.premultipliedAlpha === true ) {
+
+			outputNode = unpremultiplyAlpha( outputNode );
+
+		}
+
+		// tone mapping
 		const toneMapping = ( this._toneMapping !== null ? this._toneMapping : context.toneMapping ) || NoToneMapping;
+
 		const outputColorSpace = ( this.outputColorSpace !== null ? this.outputColorSpace : context.outputColorSpace ) || NoColorSpace;
 
 		if ( toneMapping !== NoToneMapping ) {
@@ -120,10 +140,16 @@ class RenderOutputNode extends TempNode {
 		}
 
 		// working to output color space
-
 		if ( outputColorSpace !== NoColorSpace && outputColorSpace !== ColorManagement.workingColorSpace ) {
 
 			outputNode = outputNode.workingToColorSpace( outputColorSpace );
+
+		}
+
+		// premultiply in output color space
+		if ( this.premultipliedAlpha === true ) {
+
+			outputNode = premultiplyAlpha( outputNode );
 
 		}
 
@@ -136,7 +162,7 @@ class RenderOutputNode extends TempNode {
 export default RenderOutputNode;
 
 /**
- * TSL function for creating a posterize node.
+ * TSL function for creating a render output node.
  *
  * @tsl
  * @function
@@ -145,6 +171,6 @@ export default RenderOutputNode;
  * @param {?string} [outputColorSpace=null] - The output color space.
  * @returns {RenderOutputNode}
  */
-export const renderOutput = ( color, toneMapping = null, outputColorSpace = null ) => nodeObject( new RenderOutputNode( nodeObject( color ), toneMapping, outputColorSpace ) );
+export const renderOutput = ( color, toneMapping = null, outputColorSpace = null ) => new RenderOutputNode( nodeObject( color ), toneMapping, outputColorSpace );
 
 addMethodChaining( 'renderOutput', renderOutput );

@@ -1,4 +1,4 @@
-import { Fn, If, vec4 } from '../tsl/TSLBase.js';
+import { Fn, vec4 } from '../tsl/TSLCore.js';
 import { mix, min, step } from '../math/MathNode.js';
 
 /**
@@ -18,14 +18,7 @@ export const blendBurn = /*@__PURE__*/ Fn( ( [ base, blend ] ) => {
 
 	return min( 1.0, base.oneMinus().div( blend ) ).oneMinus();
 
-} ).setLayout( {
-	name: 'blendBurn',
-	type: 'vec3',
-	inputs: [
-		{ name: 'base', type: 'vec3' },
-		{ name: 'blend', type: 'vec3' }
-	]
-} );
+}, { base: 'vec3', blend: 'vec3', return: 'vec3' } );
 
 /**
  * Represents a "Color Dodge" blend mode.
@@ -44,14 +37,7 @@ export const blendDodge = /*@__PURE__*/ Fn( ( [ base, blend ] ) => {
 
 	return min( base.div( blend.oneMinus() ), 1.0 );
 
-} ).setLayout( {
-	name: 'blendDodge',
-	type: 'vec3',
-	inputs: [
-		{ name: 'base', type: 'vec3' },
-		{ name: 'blend', type: 'vec3' }
-	]
-} );
+}, { base: 'vec3', blend: 'vec3', return: 'vec3' } );
 
 /**
  * Represents a "Screen" blend mode.
@@ -70,14 +56,7 @@ export const blendScreen = /*@__PURE__*/ Fn( ( [ base, blend ] ) => {
 
 	return base.oneMinus().mul( blend.oneMinus() ).oneMinus();
 
-} ).setLayout( {
-	name: 'blendScreen',
-	type: 'vec3',
-	inputs: [
-		{ name: 'base', type: 'vec3' },
-		{ name: 'blend', type: 'vec3' }
-	]
-} );
+}, { base: 'vec3', blend: 'vec3', return: 'vec3' } );
 
 /**
  * Represents a "Overlay" blend mode.
@@ -96,14 +75,7 @@ export const blendOverlay = /*@__PURE__*/ Fn( ( [ base, blend ] ) => {
 
 	return mix( base.mul( 2.0 ).mul( blend ), base.oneMinus().mul( 2.0 ).mul( blend.oneMinus() ).oneMinus(), step( 0.5, base ) );
 
-} ).setLayout( {
-	name: 'blendOverlay',
-	type: 'vec3',
-	inputs: [
-		{ name: 'base', type: 'vec3' },
-		{ name: 'blend', type: 'vec3' }
-	]
-} );
+}, { base: 'vec3', blend: 'vec3', return: 'vec3' } );
 
 /**
  * This function blends two color based on their alpha values by replicating the behavior of `THREE.NormalBlending`.
@@ -121,51 +93,4 @@ export const blendColor = /*@__PURE__*/ Fn( ( [ base, blend ] ) => {
 
 	return vec4( blend.rgb.mul( blend.a ).add( base.rgb.mul( base.a ).mul( blend.a.oneMinus() ) ).div( outAlpha ), outAlpha );
 
-} ).setLayout( {
-	name: 'blendColor',
-	type: 'vec4',
-	inputs: [
-		{ name: 'base', type: 'vec4' },
-		{ name: 'blend', type: 'vec4' }
-	]
-} );
-
-/**
- * Premultiplies the RGB channels of a color by its alpha channel.
- *
- * This function is useful for converting a non-premultiplied alpha color
- * into a premultiplied alpha format, where the RGB values are scaled
- * by the alpha value. Premultiplied alpha is often used in graphics
- * rendering for certain operations, such as compositing and image processing.
- *
- * @tsl
- * @function
- * @param {Node<vec4>} color - The input color with non-premultiplied alpha.
- * @return {Node<vec4>} The color with premultiplied alpha.
- */
-export const premultiplyAlpha = /*@__PURE__*/ Fn( ( [ color ] ) => {
-
-	return vec4( color.rgb.mul( color.a ), color.a );
-
-}, { color: 'vec4', return: 'vec4' } );
-
-/**
- * Unpremultiplies the RGB channels of a color by its alpha channel.
- *
- * This function is useful for converting a premultiplied alpha color
- * back into a non-premultiplied alpha format, where the RGB values are
- * divided by the alpha value. Unpremultiplied alpha is often used in graphics
- * rendering for certain operations, such as compositing and image processing.
- *
- * @tsl
- * @function
- * @param {Node<vec4>} color - The input color with premultiplied alpha.
- * @return {Node<vec4>} The color with non-premultiplied alpha.
- */
-export const unpremultiplyAlpha = /*@__PURE__*/ Fn( ( [ color ] ) => {
-
-	If( color.a.equal( 0.0 ), () => vec4( 0.0 ) );
-
-	return vec4( color.rgb.div( color.a ), color.a );
-
-}, { color: 'vec4', return: 'vec4' } );
+}, { base: 'vec4', blend: 'vec4', return: 'vec4' } );

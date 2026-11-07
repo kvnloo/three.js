@@ -43,7 +43,7 @@ class FileLoader extends Loader {
 
 		/**
 		 * The expected mime type. Valid values can be found
-		 * [here](hhttps://developer.mozilla.org/en-US/docs/Web/API/DOMParser/parseFromString#mimetype)
+		 * [here](https://developer.mozilla.org/en-US/docs/Web/API/DOMParser/parseFromString#mimetype)
 		 *
 		 * @type {string}
 		 */
@@ -74,7 +74,6 @@ class FileLoader extends Loader {
 	 * @param {function(any)} onLoad - Executed when the loading process has been finished.
 	 * @param {onProgressCallback} [onProgress] - Executed while the loading is in progress.
 	 * @param {onErrorCallback} [onError] - Executed when errors occur.
-	 * @return {any|undefined} The cached resource if available.
 	 */
 	load( url, onLoad, onProgress, onError ) {
 
@@ -98,7 +97,7 @@ class FileLoader extends Loader {
 
 			}, 0 );
 
-			return cached;
+			return;
 
 		}
 
@@ -131,6 +130,8 @@ class FileLoader extends Loader {
 		const req = new Request( url, {
 			headers: new Headers( this.requestHeader ),
 			credentials: this.withCredentials ? 'include' : 'same-origin',
+			priority: this.priority,
+			cache: this.cache,
 			signal: ( typeof AbortSignal.any === 'function' ) ? AbortSignal.any( [ this._abortController.signal, this.manager.abortController.signal ] ) : this._abortController.signal
 		} );
 

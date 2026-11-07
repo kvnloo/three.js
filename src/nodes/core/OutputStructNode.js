@@ -42,7 +42,13 @@ class OutputStructNode extends Node {
 
 	}
 
-	getNodeType( /*builder*/ ) {
+	isCacheable( /*builder*/ ) {
+
+		return false;
+
+	}
+
+	generateNodeType( /*builder*/ ) {
 
 		return 'OutputType';
 
@@ -80,7 +86,7 @@ class OutputStructNode extends Node {
 
 		for ( let i = 0; i < members.length; i ++ ) {
 
-			const snippet = members[ i ].build( builder );
+			const snippet = members[ i ].build( builder, nodeData.membersLayout[ i ].type );
 
 			builder.addLineFlowCode( `${ structPrefix }m${ i } = ${ snippet }`, this );
 
