@@ -1,4 +1,4 @@
-import * as TSL from 'three/tsl';
+import * as TSL from '../../../../../src/nodes/TSL.js';
 import IndexNode from '../../../../../src/nodes/core/IndexNode.js';
 import WGSLNodeBuilder from '../../../../../src/renderers/webgpu/nodes/WGSLNodeBuilder.js';
 import { rawComputeTest, readUintBuffer } from './gpu-raw-test-utils.js';
