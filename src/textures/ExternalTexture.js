@@ -20,14 +20,6 @@ class ExternalTexture extends Texture {
 		super();
 
 		/**
-		 * The external source texture.
-		 *
-		 * @type {?(WebGLTexture|GPUTexture)}
-		 * @default null
-		 */
-		this.sourceTexture = sourceTexture;
-
-		/**
 		 * This flag can be used for type testing.
 		 *
 		 * @type {boolean}
@@ -35,6 +27,42 @@ class ExternalTexture extends Texture {
 		 * @default true
 		 */
 		this.isExternalTexture = true;
+
+		this.sourceTexture = sourceTexture;
+
+	}
+
+	/**
+	 * The externally owned GPU texture or WebGL texture handle.
+	 * GPUTexture dimensions are reflected in the image for render-target sizing.
+	 *
+	 * @type {?(WebGLTexture|GPUTexture)}
+	 */
+	get sourceTexture() {
+
+		return this._sourceTexture;
+
+	}
+
+	set sourceTexture( value ) {
+
+		if ( this._sourceTexture === value ) return;
+
+		this._sourceTexture = value;
+
+		if ( value !== null && value !== undefined && typeof value.width === 'number' ) {
+
+			this.image = { width: value.width, height: value.height, depth: value.depthOrArrayLayers || 1 };
+			this.isArrayTexture = this.image.depth > 1;
+
+		} else {
+
+			this.image = null;
+			this.isArrayTexture = false;
+
+		}
+
+		this.needsUpdate = true;
 
 	}
 
