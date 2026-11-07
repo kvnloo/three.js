@@ -109,13 +109,18 @@ class MeshSubsurfaceNodeMaterial extends MeshStandardNodeMaterial {
 
 	copy( source ) {
 
-		this.scatteringDistanceNode = source.scatteringDistanceNode;
-		this.scatteringColorNode = source.scatteringColorNode;
-		this.strengthNode = source.strengthNode;
-		this.texturingModeNode = source.texturingModeNode;
-		// subsurfaceSlotNode is NOT copied — each instance owns its own slot
+		super.copy( source );
 
-		return super.copy( source );
+		// These controls belong to the new material, not to the source.
+		this.scatteringDistanceNode = uniform( source.scatteringDistanceNode.value.clone() );
+		this.scatteringColorNode = uniform( source.scatteringColorNode.value.clone() );
+		this.strengthNode = uniform( source.strengthNode.value );
+		this.texturingModeNode = uniform( source.texturingModeNode.value );
+
+		// Each SSSS effect assigns its own slot when this material is first drawn.
+		this.subsurfaceSlotNode = uniform( 0 );
+
+		return this;
 
 	}
 

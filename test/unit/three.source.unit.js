@@ -182,6 +182,9 @@ import './src/materials/ShadowMaterial.tests.js';
 import './src/materials/SpriteMaterial.tests.js';
 
 
+//src/materials/nodes
+import './src/materials/nodes/MeshSubsurfaceNodeMaterial.tests.js';
+
 //src/math
 import './src/math/Box2.tests.js';
 import './src/math/Box3.tests.js';
