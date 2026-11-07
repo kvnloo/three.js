@@ -243,9 +243,10 @@ class KTX2Loader extends Loader {
 			this.workerConfig = {
 				astcSupported: renderer.hasFeature( 'texture-compression-astc' ),
 				astcHDRSupported: false, // https://github.com/gpuweb/gpuweb/issues/3856
-				etc1Supported: renderer.hasFeature( 'texture-compression-etc1' ),
+				etc1Supported: false, // WebGPU ETC1 is included in ETC2 compression support.
 				etc2Supported: renderer.hasFeature( 'texture-compression-etc2' ),
-				dxtSupported: renderer.hasFeature( 'texture-compression-s3tc' ),
+				dxtSupported: false, // WebGPU exposes the BC family through texture-compression-bc.
+				rgtcSupported: false, // WebGPU BC4/BC5 belong to texture-compression-bc.
 				bptcSupported: renderer.hasFeature( 'texture-compression-bc' ),
 				pvrtcSupported: renderer.hasFeature( 'texture-compression-pvrtc' )
 			};
@@ -259,6 +260,7 @@ class KTX2Loader extends Loader {
 				etc1Supported: renderer.extensions.has( 'WEBGL_compressed_texture_etc1' ),
 				etc2Supported: renderer.extensions.has( 'WEBGL_compressed_texture_etc' ),
 				dxtSupported: renderer.extensions.has( 'WEBGL_compressed_texture_s3tc' ),
+				rgtcSupported: renderer.extensions.has( 'EXT_texture_compression_rgtc' ),
 				bptcSupported: renderer.extensions.has( 'EXT_texture_compression_bptc' ),
 				pvrtcSupported: renderer.extensions.has( 'WEBGL_compressed_texture_pvrtc' )
 					|| renderer.extensions.has( 'WEBKIT_WEBGL_compressed_texture_pvrtc' )
