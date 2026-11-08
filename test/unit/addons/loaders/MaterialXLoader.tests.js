@@ -159,11 +159,196 @@ function parseNodeGraph( body, type ) {
 
 }
 
+
+function findMaterialXSampler( value, visited = new WeakSet(), depth = 0 ) {
+
+	if ( value === null || ( typeof value !== 'object' && typeof value !== 'function' ) || visited.has( value ) || depth > 48 ) return null;
+	visited.add( value );
+
+	if ( value.isTextureNode === true && value.uvNode !== null ) return value;
+
+	for ( const child of Object.values( value ) ) {
+
+		const sampler = findMaterialXSampler( child, visited, depth + 1 );
+		if ( sampler !== null ) return sampler;
+
+	}
+
+	return null;
+
+}
+
+// Interpret only the constant TSL node shapes produced for these image coordinates.
+// Unknown operations must fail the test rather than silently returning expected UVs.
+function evaluateMaterialXUv( node ) {
+
+	if ( node.isConstNode === true ) {
+
+		const value = node.value;
+		if ( typeof value === 'number' ) return [ value ];
+		if ( value.isVector2 === true ) return [ value.x, value.y ];
+		throw new Error( 'Unexpected UV constant: ' + String( value ) );
+
+	}
+
+	if ( node.isArrayElementNode === true ) {
+
+		return [ evaluateMaterialXUv( node.node )[ evaluateMaterialXUv( node.indexNode )[ 0 ] ] ];
+
+	}
+
+	const type = node.constructor.type;
+
+	if ( type === 'ConvertNode' ) return evaluateMaterialXUv( node.node );
+	if ( type === 'JoinNode' ) return node.nodes.flatMap( evaluateMaterialXUv );
+
+	if ( type === 'SplitNode' ) {
+
+		const source = evaluateMaterialXUv( node.node );
+		return Array.from( node.components, ( component ) => source[ 'xyzw'.indexOf( component ) ] );
+
+	}
+
+	if ( type === 'FlipNode' ) {
+
+		return evaluateMaterialXUv( node.sourceNode ).map( ( value, index ) =>
+			node.components.includes( 'xyzw'[ index ] ) ? 1 - value : value );
+
+	}
+
+	if ( node.isOperatorNode === true ) {
+
+		const a = evaluateMaterialXUv( node.aNode );
+		const b = evaluateMaterialXUv( node.bNode );
+		const size = Math.max( a.length, b.length );
+
+		return Array.from( { length: size }, ( _, index ) => {
+
+			const left = a.length === 1 ? a[ 0 ] : a[ index ];
+			const right = b.length === 1 ? b[ 0 ] : b[ index ];
+
+			switch ( node.op ) {
+
+				case '+': return left + right;
+				case '-': return left - right;
+				case '*': return left * right;
+				case '/': return left / right;
+				default: throw new Error( 'Unexpected UV operator: ' + node.op );
+
+			}
+
+		} );
+
+	}
+
+	throw new Error( 'Unexpected UV node: ' + type );
+
+}
+
+function sampleMaterialXImageUv( category, inputs, uvSpace ) {
+
+	// Two-color 2x2, top-first: red/blue on the first row, blue/red on the second.
+	const pixels = new Uint8Array( [
+		255, 0, 0, 255, 0, 0, 255, 255,
+		0, 0, 255, 255, 255, 0, 0, 255
+	] );
+	const manager = new LoadingManager();
+
+	manager.addHandler( /\.test$/i, {
+
+		load( url, onLoad ) {
+
+			if ( url.endsWith( 'texture.test' ) === false ) throw new Error( 'Unexpected texture URL: ' + url );
+			const texture = new DataTexture( pixels, 2, 2 );
+			texture.minFilter = NearestFilter;
+			texture.magFilter = NearestFilter;
+			texture.generateMipmaps = false;
+			texture.flipY = true;
+			onLoad( texture );
+			return texture;
+
+		}
+
+	} );
+
+	const xml = '<materialx version="1.39"><nodegraph name="test_graph">' +
+		'<' + category + ' name="test_node" type="color3">' +
+		'<input name="file" type="filename" value="texture.test" />' +
+		inputs +
+		'</' + category + '>' +
+		'<output name="out" type="color3" nodename="test_node" />' +
+		'</nodegraph></materialx>';
+
+	const result = new MaterialXLoader( manager ).parse( xml, { uvSpace } );
+	if ( result.errors.length !== 0 ) throw new Error( JSON.stringify( result.errors ) );
+
+	const sampler = findMaterialXSampler( result.materials.test_graph.colorNode );
+	if ( sampler === null ) throw new Error( 'MaterialX image sampler was not constructed' );
+
+	return { uv: evaluateMaterialXUv( sampler.uvNode ), texture: sampler.value };
+
+}
+
+function sampleCheckerboardReference( texture, uv ) {
+
+	const { data, width, height } = texture.image;
+	const x = Math.floor( uv[ 0 ] * width );
+	const y = Math.floor( uv[ 1 ] * height );
+	if ( x < 0 || x >= width || y < 0 || y >= height ) throw new Error( 'UV outside checkerboard' );
+
+	const index = ( y * width + x ) * 4;
+	return Array.from( data.slice( index, index + 3 ) );
+
+}
+
 export default QUnit.module( 'Addons', () => {
 
 	QUnit.module( 'Loaders', () => {
 
 		QUnit.module( 'MaterialXLoader', () => {
+
+
+			QUnit.test( 'image UV: bottom-left coordinates sample top-first storage', ( assert ) => {
+
+				const sampled = sampleMaterialXImageUv( 'image',
+					'<input name="texcoord" type="vector2" value="0.25, 0.75" />', 'bottom-left' );
+				assert.deepEqual( sampled.uv, [ 0.25, 0.25 ], 'A bottom-left input flips Y for top-first image storage.' );
+
+			} );
+
+			QUnit.test( 'image UV: top-left input keeps its existing mapping', ( assert ) => {
+
+				const sampled = sampleMaterialXImageUv( 'image',
+					'<input name="texcoord" type="vector2" value="0.25, 0.75" />', 'top-left' );
+				assert.deepEqual( sampled.uv, [ 0.25, 0.25 ], 'Explicit top-left control preserves its image-space mapping.' );
+
+			} );
+
+			QUnit.test( 'tiledimage UV: offset subtracts and real-world sizes scale before Y flip', ( assert ) => {
+
+				const sampled = sampleMaterialXImageUv( 'tiledimage',
+					'<input name="texcoord" type="vector2" value="0.5, 0.25" />' +
+					'<input name="uvtiling" type="vector2" value="1, 1" />' +
+					'<input name="uvoffset" type="vector2" value="0.25, 0" />' +
+					'<input name="realworldimagesize" type="vector2" value="2, 2" />' +
+					'<input name="realworldtilesize" type="vector2" value="1, 1" />', 'bottom-left' );
+				assert.deepEqual( sampled.uv, [ 0.125, 0.875 ], '((UV * tiling - offset) / image size) * tile size, then flip Y.' );
+
+			} );
+
+			QUnit.test( 'image UV: two-color checkerboard CPU reference', ( assert ) => {
+
+				const top = sampleMaterialXImageUv( 'image',
+					'<input name="texcoord" type="vector2" value="0.25, 0.75" />', 'bottom-left' );
+				const bottom = sampleMaterialXImageUv( 'image',
+					'<input name="texcoord" type="vector2" value="0.25, 0.25" />', 'bottom-left' );
+
+				assert.false( top.texture.flipY, 'The handler texture is normalized to top-first storage.' );
+				assert.deepEqual( sampleCheckerboardReference( top.texture, top.uv ), [ 255, 0, 0 ], 'Upper-left texel is red.' );
+				assert.deepEqual( sampleCheckerboardReference( bottom.texture, bottom.uv ), [ 0, 0, 255 ], 'Lower-left texel is blue.' );
+
+			} );
+
 
 			QUnit.test( 'texture settings', ( assert ) => {
 
