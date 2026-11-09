@@ -4,6 +4,9 @@ import {
 	transpose, greaterThan
 } from 'three/tsl';
 import { gpuTest } from './gpu-test-utils.js';
+import NodeBuilder from '../../../../../src/nodes/core/NodeBuilder.js';
+import StructTypeNode from '../../../../../src/nodes/core/StructTypeNode.js';
+import { parameter } from '../../../../../src/nodes/core/ParameterNode.js';
 
 // Coverage for the smaller/less-common TSL type constructors built by
 // TSLCore.js's `ConvertType` factory (the same machinery mat3()/mat4() go
@@ -14,6 +17,26 @@ export default QUnit.module( 'Nodes', () => {
 	QUnit.module( 'TSL', () => {
 
 		QUnit.module( 'type constructors', () => {
+
+			QUnit.test( 'Struct parameter member types are resolved across shader stages', ( assert ) => {
+
+				// Reproduces #34721 without a renderer, DOM, or GPU.
+				const builder = new NodeBuilder();
+				const struct = new StructTypeNode( { tint: 'vec3', scale: 'float' }, 'Params' );
+
+				builder.setShaderStage( 'vertex' );
+				struct.setup( builder );
+				assert.strictEqual( builder.structs.vertex.length, 1, 'one vertex-stage struct declaration' );
+
+				builder.setShaderStage( 'fragment' );
+				const input = parameter( 'Params', 'p' );
+
+				assert.strictEqual( input.getMemberType( builder, 'tint' ), 'vec3', 'vector field retains its type' );
+				assert.strictEqual( input.getMemberType( builder, 'scale' ), 'float', 'scalar field retains its type' );
+				assert.strictEqual( builder.getStructTypeNode( 'Params' ), struct, 'struct is registered for the fragment stage' );
+				assert.strictEqual( builder.structs.fragment.length, 1, 'one fragment-stage struct declaration' );
+
+			} );
 
 			gpuTest( 'mat2(a,b,c,d) 4-scalar constructor is ROW-major, like mat3()/mat4() (see TSLVectorMatrix.tests.js)', ( { assert } ) => {
 
