@@ -161,7 +161,7 @@ class LightMapper {
 
 		// all textures are in the space of the light map
 
-		for ( const map of [ this.varianceTexture, this.positionTexture, this.normalTexture ] ) if ( map !== null ) map.channel = 1;
+		for ( const map of [ this._accumulation.texture, this.varianceTexture, this.positionTexture, this.normalTexture ] ) if ( map !== null ) map.channel = 1;
 
 		this._textureNodes = {};
 
@@ -233,16 +233,18 @@ class LightMapper {
 	}
 
 	/**
-	 * Returns a texture of the light mapper: `'color'`, the light map, or the inputs of a denoiser like
+	 * Returns a texture of the light mapper: `'color'`, the light map, `'coverage'`, the sums of the samples
+	 * with their count in alpha, which is zero at the texels outside the charts, e.g. for
+	 * {@link SeamStitchGenerator} and {@link GutterFillGenerator}, or the inputs of a denoiser like
 	 * {@link DenoiseNode}: `'variance'` with the `variance` option, `'position'` and `'normal'` with
 	 * the `guides` option.
 	 *
-	 * @param {('color'|'variance'|'position'|'normal')} [name='color'] - The name of the texture.
+	 * @param {('color'|'coverage'|'variance'|'position'|'normal')} [name='color'] - The name of the texture.
 	 * @return {Texture} The texture.
 	 */
 	getTexture( name = 'color' ) {
 
-		const map = { color: this.texture, variance: this.varianceTexture, position: this.positionTexture, normal: this.normalTexture }[ name ];
+		const map = { color: this.texture, coverage: this._accumulation.texture, variance: this.varianceTexture, position: this.positionTexture, normal: this.normalTexture }[ name ];
 
 		if ( map === undefined ) throw new Error( `THREE.LightMapper: Unknown texture "${ name }".` );
 		if ( map === null ) throw new Error( `THREE.LightMapper: The "${ name }" texture needs the ${ name === 'variance' ? 'variance' : 'guides' } option.` );
@@ -255,7 +257,7 @@ class LightMapper {
 	 * Returns a texture of the light mapper as a texture node, see {@link LightMapper#getTexture}. The
 	 * nodes sample the light map UVs, e.g. `material.lightMapNode = lightMapper.getTextureNode()`.
 	 *
-	 * @param {('color'|'variance'|'position'|'normal')} [name='color'] - The name of the texture.
+	 * @param {('color'|'coverage'|'variance'|'position'|'normal')} [name='color'] - The name of the texture.
 	 * @return {TextureNode} The texture node.
 	 */
 	getTextureNode( name = 'color' ) {
