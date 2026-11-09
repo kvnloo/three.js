@@ -1,6 +1,7 @@
 import { error } from '../../utils.js';
 import StackTrace from '../core/StackTrace.js';
 import PropertyNode from './PropertyNode.js';
+import { shaderStages } from './constants.js';
 
 /**
  * Special version of {@link PropertyNode} which is used for parameters.
@@ -46,7 +47,26 @@ class ParameterNode extends PropertyNode {
 	getMemberType( builder, name ) {
 
 		const type = this.getNodeType( builder );
-		const struct = builder.getStructTypeNode( type );
+		let struct = builder.getStructTypeNode( type );
+
+		// A struct can be registered in a different shader stage first.
+		if ( struct === null ) {
+
+			for ( const shaderStage of shaderStages ) {
+
+				const knownStruct = builder.getStructTypeNode( type, shaderStage );
+
+				if ( knownStruct !== null ) {
+
+					builder.getStructTypeFromNode( knownStruct, knownStruct.membersLayout, type );
+					struct = knownStruct;
+					break;
+
+				}
+
+			}
+
+		}
 
 		let memberType;
 
