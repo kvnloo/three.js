@@ -7,6 +7,7 @@ import './tsl/TSL.tests.js';
 //src
 import './src/constants.tests.js';
 import './src/utils.tests.js';
+import './src/utils/SeamStitchGenerator.tests.js';
 
 
 //src/animation
