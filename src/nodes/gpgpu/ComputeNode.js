@@ -54,18 +54,18 @@ class ComputeNode extends Node {
 		this.workgroupSize = workgroupSize;
 
 		/**
-		 * The total number of threads (invocations) to execute. If it is a number, it will be used
-		 * to automatically generate bounds checking against `instanceIndex`.
+		 * The logical invocation count used for bounds checking against `instanceIndex`
+		 * when the shader backend supports early returns.
 		 *
 		 * @type {number|Array<number>}
 		 */
 		this.count = null;
 
 		/**
-		 * The dispatch size for workgroups on X, Y, and Z axes.
-		 * Used directly if `count` is not provided.
+		 * The workgroup-grid dimensions (or indirect buffer), used when `count` is not provided.
+		 * Unlike a numeric `count`, this does not add an invocation bounds guard.
 		 *
-		 * @type {number|Array<number>}
+		 * @type {number|Array<number>|IndirectStorageBufferAttribute}
 		 */
 		this.dispatchSize = null;
 
@@ -293,7 +293,8 @@ export const computeKernel = ( node, workgroupSize = [ 64 ] ) => {
  * @tsl
  * @function
  * @param {Node} node - The TSL logic for the compute shader.
- * @param {number|Array<number>} count - The compute count or dispatch size.
+ * @param {number|Array<number>|IndirectStorageBufferAttribute} count - A number is a logical invocation count
+ * with an `instanceIndex` guard when supported; an array or indirect buffer specifies workgroup counts.
  * @param {Array<number>} [workgroupSize=[64]] - The workgroup size.
  * @returns {ComputeNode}
 ,  */
