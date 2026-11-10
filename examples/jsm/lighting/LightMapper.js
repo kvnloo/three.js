@@ -233,8 +233,8 @@ class LightMapper {
 	}
 
 	/**
-	 * Returns a texture of the light mapper: `'color'`, the light map, `'coverage'`, the sums of the samples
-	 * with their count in alpha, which is zero at the texels outside the charts, e.g. for
+	 * Returns a texture of the light mapper: `'color'`, the light map, `'coverage'`, the weighted sums of the
+	 * samples with the sum of their weights in alpha, which is zero at the texels outside the charts, e.g. for
 	 * {@link SeamStitchGenerator} and {@link GutterFillGenerator}, or the inputs of a denoiser like
 	 * {@link DenoiseNode}: `'variance'` with the `variance` option, `'position'` and `'normal'` with
 	 * the `guides` option.
