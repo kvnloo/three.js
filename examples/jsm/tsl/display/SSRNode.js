@@ -1,4 +1,4 @@
-import { Break, Continue, Fn, If, Loop, abs, bool, cross, distance, div, dot, float, getScreenPosition, getViewPosition, int, luminance, max, min, mix, mul, nodeObject, normalize, orthographicDepthToViewZ, passTexture, perspectiveDepthToViewZ, reference, reflect, sub, texture, textureSize, trunc, uniform, uv, vec2, vec3, vec4, context, isBackgroundDepth, projectionDepth } from 'three/tsl';
+import { Break, Continue, Fn, If, Loop, abs, bool, cross, distance, div, dot, float, getScreenPosition, getViewPosition, int, luminance, max, min, mix, mul, nodeObject, normalize, passTexture, reference, reflect, sub, texture, textureSize, trunc, uniform, uv, vec2, vec3, vec4, context, isBackgroundDepth, projectionDepth, depthToViewZ } from 'three/tsl';
 import { HalfFloatType, LinearFilter, LinearMipmapLinearFilter, Matrix4, NodeMaterial, NodeUpdateType, QuadMesh, RenderTarget, RendererUtils, Node, Vector2, Vector3 } from 'three/webgpu';
 import { bindAnalyticNoise } from '../utils/RNoise.js';
 import { ENV_RAY_LENGTH, getSpecularDominantFactor, ggxReflectionSample } from '../utils/SpecularHelpers.js';
@@ -686,9 +686,9 @@ class SSRNode extends Node {
 	/**
 	 * Wires the feedback inputs for multi-bounce reflections: the previous frame's
 	 * denoised result (`history`) and the velocity buffer used to reproject it
-	 * (`velocity`). `history` accepts the producing node (e.g. a
-	 * {@link RecurrentDenoiseNode}) — its output render target is used — or a raw
-	 * texture. Pass `null` for both to disable multi-bounce.
+	 * (`velocity`). `history` accepts a texture, e.g. the output of a {@link DenoiseNode}
+	 * (`getTexture()`), or a node with a render target, whose texture is used. Pass `null`
+	 * for both to disable multi-bounce.
 	 *
 	 * @param {Texture} history
 	 * @param {Node<vec2>} velocity
@@ -850,24 +850,6 @@ class SSRNode extends Node {
 			return distance;
 
 		}, { point: 'vec3', planePoint: 'vec3', planeNormal: 'vec3', return: 'float' } );
-
-		const getViewZ = Fn( ( [ depth ] ) => {
-
-			let viewZNode;
-
-			if ( this.camera.isPerspectiveCamera ) {
-
-				viewZNode = perspectiveDepthToViewZ( depth, this._cameraNear, this._cameraFar );
-
-			} else {
-
-				viewZNode = orthographicDepthToViewZ( depth, this._cameraNear, this._cameraFar );
-
-			}
-
-			return viewZNode;
-
-		} );
 
 		const sampleDepth = ( uv ) => projectionDepth( this.depthNode.sample( uv ).r, this._cameraNear, this._cameraFar );
 
@@ -1160,8 +1142,9 @@ class SSRNode extends Node {
 				} );
 
 				const uvS = xy.mul( invResolution ).toVar();
-				const d = sampleDepth( uvS ).toVar();
-				const vZ = getViewZ( d ).toVar();
+				const rawDepth = this.depthNode.sample( uvS ).r;
+				const d = projectionDepth( rawDepth, this._cameraNear, this._cameraFar ).toVar();
+				const vZ = depthToViewZ( rawDepth, this._cameraNear, this._cameraFar, this.camera ).toVar();
 
 				const viewReflectRayZ = reflectRayZAt( s ).toVar();
 
@@ -1248,7 +1231,7 @@ class SSRNode extends Node {
 
 							const sMid = hitSLo.add( hitSHi ).mul( 0.5 ).toVar();
 							const uvMid = screenPosAt( sMid ).mul( invResolution ).toConst();
-							const sceneZMid = getViewZ( sampleDepth( uvMid ) );
+							const sceneZMid = depthToViewZ( this.depthNode.sample( uvMid ).r, this._cameraNear, this._cameraFar, this.camera );
 							const frontFacing = dot( viewReflectDir, this.normalNode.sample( uvMid ).rgb.normalize() ).lessThan( 0 );
 
 							If( reflectRayZAt( sMid ).lessThanEqual( sceneZMid ).and( frontFacing ), () => {
