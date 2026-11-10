@@ -4,6 +4,7 @@ import {
 	uint
 } from 'three/tsl';
 import { rawComputeTest, readUintBuffer } from './gpu-raw-test-utils.js';
+import { getSharedRenderer } from './gpu-test-utils.js';
 
 // Coverage for the compute-scope builtins in ComputeBuiltinNode.js
 // (`localId`, `workgroupId`, `globalId`, `numWorkgroups`) -- previously
@@ -121,6 +122,87 @@ export default QUnit.module( 'Nodes', () => {
 					}
 
 				}
+
+			} );
+
+
+			// These three tests deliberately fail (rather than soft-skip) if
+			// WebGPU is unavailable or WebGPURenderer falls back to WebGL2.
+			async function requireWebGPU( assert ) {
+
+				const renderer = await getSharedRenderer( 'webgpu' );
+
+				assert.ok( renderer !== null && renderer.backend.isWebGPUBackend === true, 'real WebGPU backend required, not WebGL2 fallback' );
+
+				return renderer?.backend.isWebGPUBackend === true ? renderer : null;
+
+			}
+
+			QUnit.test( 'numeric count guards padded workgroup invocations', async ( assert ) => {
+
+				const renderer = await requireWebGPU( assert );
+				if ( renderer === null ) return;
+
+				const output = instancedArray( 12, 'uint' );
+				const kernel = Fn( () => {
+
+					output.element( instanceIndex ).assign( instanceIndex.add( uint( 1 ) ) );
+
+				} )().compute( 10, [ 4 ] );
+
+				await renderer.computeAsync( kernel );
+
+				const data = await readUintBuffer( renderer, output );
+
+				assert.deepEqual( Array.from( data ),
+					[ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 0 ],
+					'3 x 4 lanes launch but the node-level count guard stops lanes 10 and 11' );
+
+			} );
+
+			QUnit.test( 'renderer numeric override does not add a count guard', async ( assert ) => {
+
+				const renderer = await requireWebGPU( assert );
+				if ( renderer === null ) return;
+
+				const output = instancedArray( 12, 'uint' );
+				const kernel = Fn( () => {
+
+					output.element( instanceIndex ).assign( instanceIndex.add( uint( 1 ) ) );
+
+				} )().computeKernel( [ 4 ] );
+
+				await renderer.computeAsync( kernel, 10 );
+
+				const data = await readUintBuffer( renderer, output );
+
+				assert.deepEqual( Array.from( data ),
+					[ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 ],
+					'3 x 4 lanes all write because renderer numeric overrides do not insert a guard' );
+
+			} );
+
+			QUnit.test( 'explicit 2D grid dispatches all workgroup lanes', async ( assert ) => {
+
+				const renderer = await requireWebGPU( assert );
+				if ( renderer === null ) return;
+
+				const output = instancedArray( 48, 'uint' );
+				const kernel = Fn( () => {
+
+					// 2 workgroups of width 4 produce x in [0, 7].
+					// 3 workgroups of height 2 produce y in [0, 5].
+					const slot = globalId.y.mul( uint( 8 ) ).add( globalId.x );
+					output.element( slot ).assign( uint( 1 ) );
+
+				} )().compute( [ 2, 3, 1 ], [ 4, 2, 1 ] );
+
+				await renderer.computeAsync( kernel );
+
+				const data = await readUintBuffer( renderer, output );
+
+				assert.deepEqual( Array.from( data ), Array( 48 ).fill( 1 ),
+					'2 x 3 workgroups of 4 x 2 lanes write 48 distinct slots' );
 
 			} );
 
