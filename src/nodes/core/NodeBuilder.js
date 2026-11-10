@@ -4,7 +4,6 @@ import NodeVarying from './NodeVarying.js';
 import NodeVar from './NodeVar.js';
 import NodeCode from './NodeCode.js';
 import NodeCache from './NodeCache.js';
-import Node from './Node.js';
 import ParameterNode from './ParameterNode.js';
 import StructType from './StructType.js';
 import FunctionNode from '../code/FunctionNode.js';
@@ -31,7 +30,7 @@ import { Vector2 } from '../../math/Vector2.js';
 import { Vector3 } from '../../math/Vector3.js';
 import { Vector4 } from '../../math/Vector4.js';
 import { Float16BufferAttribute } from '../../core/BufferAttribute.js';
-import { warn, error } from '../../utils.js';
+import { warn, error, yieldToMain } from '../../utils.js';
 
 let _id = 0;
 
@@ -136,8 +135,6 @@ const _isMatrixCache = new Map();
 const _isIntegerCache = new Map();
 
 const _checkWriteUsage = ( data ) => {
-
-	if ( data === undefined ) return false;
 
 	if ( data.writeUsageCount > 0 ) return true;
 
@@ -287,7 +284,7 @@ class NodeBuilder {
 		/**
 		 * A dictionary that assigns each node to a unique hash.
 		 *
-		 * @type {Map<string,Node>}
+		 * @type {Map<string|number,Node>}
 		 */
 		this.hashNodes = new Map();
 
@@ -855,7 +852,7 @@ class NodeBuilder {
 	 * This method sets the given node (value) with the given hash (key) into this dictionary.
 	 *
 	 * @param {Node} node - The node to add.
-	 * @param {number} hash - The hash of the node.
+	 * @param {string|number} hash - The hash of the node.
 	 */
 	setHashNode( node, hash ) {
 
@@ -874,13 +871,7 @@ class NodeBuilder {
 
 			this.nodes.add( node );
 
-			// the default hash is unique per node, so only nodes with a custom hash can be shared
-
-			if ( node.getHash !== Node.prototype.getHash ) {
-
-				this.setHashNode( node, node.getHash( this ) );
-
-			}
+			this.setHashNode( node, node.getHash( this ) );
 
 		}
 
@@ -1079,7 +1070,7 @@ class NodeBuilder {
 	/**
 	 * Returns a node for the given hash, see {@link NodeBuilder#setHashNode}.
 	 *
-	 * @param {number} hash - The hash of the node.
+	 * @param {string|number} hash - The hash of the node.
 	 * @return {Node} The found node.
 	 */
 	getNodeFromHash( hash ) {
@@ -2215,8 +2206,7 @@ class NodeBuilder {
 
 		if ( nodeData === undefined ) {
 
-			// define all stages upfront so the objects share the same shape
-
+			// Keep the stage slots in a consistent order regardless of the first requested stage.
 			nodeData = { vertex: undefined, fragment: undefined, compute: undefined, any: undefined };
 
 			cache.setData( node, nodeData );
@@ -3698,6 +3688,70 @@ class NodeBuilder {
 					}
 
 				}
+
+			}
+
+		}
+
+		this.setBuildStage( null );
+		this.setShaderStage( null );
+
+		// stage 4: build code for a specific output
+
+		this.buildCode();
+		this.buildUpdateNodes();
+
+		return this;
+
+	}
+
+	/**
+	 * Async version of build() that yields to main thread between shader stages.
+	 * Use this in compileAsync() to prevent blocking the main thread.
+	 *
+	 * @param {Function} [yieldFn=yieldToMain] - The function used to yield to the main thread.
+	 * @return {Promise<NodeBuilder>} A promise that resolves to this node builder.
+	 */
+	async buildAsync( yieldFn = yieldToMain ) {
+
+		this.prebuild();
+
+		// setup() -> stage 1: create possible new nodes and/or return an output reference node
+		// analyze()   -> stage 2: analyze nodes to possible optimization and validation
+		// generate()  -> stage 3: generate shader
+
+		for ( const buildStage of defaultBuildStages ) {
+
+			this.setBuildStage( buildStage );
+
+			if ( this.context.position && this.context.position.isNode ) {
+
+				this.flowNodeFromShaderStage( 'vertex', this.context.position );
+
+			}
+
+			for ( const shaderStage of shaderStages ) {
+
+				this.setShaderStage( shaderStage );
+
+				const flowNodes = this.flowNodes[ shaderStage ];
+
+				for ( const node of flowNodes ) {
+
+					if ( buildStage === 'generate' ) {
+
+						this.flowNode( node );
+
+					} else {
+
+						node.build( this );
+
+					}
+
+				}
+
+				// Yield to main thread after each shader stage to prevent blocking
+				await yieldFn();
 
 			}
 
