@@ -284,9 +284,9 @@ class NodeBuilder {
 		/**
 		 * A dictionary that assigns each node to a unique hash.
 		 *
-		 * @type {Object<number,Node>}
+		 * @type {Map<string|number,Node>}
 		 */
-		this.hashNodes = {};
+		this.hashNodes = new Map();
 
 		/**
 		 * A reference to a node material observer.
@@ -852,11 +852,11 @@ class NodeBuilder {
 	 * This method sets the given node (value) with the given hash (key) into this dictionary.
 	 *
 	 * @param {Node} node - The node to add.
-	 * @param {number} hash - The hash of the node.
+	 * @param {string|number} hash - The hash of the node.
 	 */
 	setHashNode( node, hash ) {
 
-		this.hashNodes[ hash ] = node;
+		this.hashNodes.set( hash, node );
 
 	}
 
@@ -1070,12 +1070,12 @@ class NodeBuilder {
 	/**
 	 * Returns a node for the given hash, see {@link NodeBuilder#setHashNode}.
 	 *
-	 * @param {number} hash - The hash of the node.
+	 * @param {string|number} hash - The hash of the node.
 	 * @return {Node} The found node.
 	 */
 	getNodeFromHash( hash ) {
 
-		return this.hashNodes[ hash ];
+		return this.hashNodes.get( hash );
 
 	}
 
@@ -2206,17 +2206,18 @@ class NodeBuilder {
 
 		if ( nodeData === undefined ) {
 
-			nodeData = {};
+			// Keep the stage slots in a consistent order regardless of the first requested stage.
+			nodeData = { vertex: undefined, fragment: undefined, compute: undefined, any: undefined };
 
 			cache.setData( node, nodeData );
 
 		}
 
-		if ( nodeData[ shaderStage ] === undefined ) nodeData[ shaderStage ] = new NodeData();
+		let data = nodeData[ shaderStage ];
+
+		if ( data === undefined ) nodeData[ shaderStage ] = data = new NodeData();
 
 		//
-
-		let data = nodeData[ shaderStage ];
 
 		if ( this.subBuildLayers.length === 0 ) return data;
 
