@@ -3209,16 +3209,14 @@ class Renderer {
 	 * if the renderer has been initialized.
 	 *
 	 * @param {Node|Array<Node>} computeNodes - The compute node(s).
-	 * @param {number|Array<number>|IndirectStorageBufferAttribute} [dispatchSize=null]
-	 * An argument that defines the number of compute invocations executed in a compute call
-	 * and the size of the dispatched workgroup grid in which they are executed.
-	 * Depending on the type of the argument, the dispatch size of a compute call will be determined in different ways.
-	 * - A number will dispatch a workgroup grid sized to fit `dispatchSize` invocations.
-	 * - An array [x, y, z] will directly define the size of the workgroup grid.
-	 *   The compute call will execute x * y * z * workgroupSize invocations.
-	 * - A IndirectStorageBufferAttribute will run an indirect compute dispatch.
-	 *   In an indirect dispatch, the [x, y, z] dimensions of the workgroup grid are defined by the first three values
-	 *   stored in the IndirectStorageBufferAttribute.
+	 * @param {number|Array<number>|IndirectStorageBufferAttribute} [dispatchSize=null] - Optional workgroup-grid override for `computeKernel()` nodes.
+	 * - A number N rounds up to whole workgroups and can launch more than N invocations.
+	 *   It does not add a shader-side `instanceIndex` bounds guard.
+	 * - An array [x, y, z] directly sets workgroup counts, launching
+	 *   x * y * z * product(workgroupSize) invocations.
+	 * - An IndirectStorageBufferAttribute supplies GPU-defined workgroup counts.
+	 * In contrast, node-level `compute(N, workgroupSize)` adds an `instanceIndex`
+	 * count guard when the shader backend supports early returns.
 	 * @return {Promise|undefined} A Promise that resolve when the compute has finished. Only returned when the renderer has not been initialized.
 	 */
 	compute( computeNodes, dispatchSize = null ) {
@@ -3340,16 +3338,14 @@ class Renderer {
 	 *
 	 * @async
 	 * @param {Node|Array<Node>} computeNodes - The compute node(s).
-	 * @param {number|Array<number>|IndirectStorageBufferAttribute} [dispatchSize=null]
-	 * An argument that defines the number of compute invocations executed in a compute call
-	 * and the size of the dispatched workgroup grid in which they are executed.
-	 * Depending on the type of the argument, the dispatch size of a compute call will be determined in different ways.
-	 * - A number will dispatch a workgroup grid sized to fit `dispatchSize` invocations.
-	 * - An array [x, y, z] will directly define the size of the workgroup grid.
-	 *   The compute call will execute x * y * z * workgroupSize invocations.
-	 * - A IndirectStorageBufferAttribute will run an indirect compute dispatch.
-	 *   In an indirect dispatch, the [x, y, z] dimensions of the workgroup grid are defined by the first three values
-	 *   stored in the IndirectStorageBufferAttribute.
+	 * @param {number|Array<number>|IndirectStorageBufferAttribute} [dispatchSize=null] - Optional workgroup-grid override for `computeKernel()` nodes.
+	 * - A number N rounds up to whole workgroups and can launch more than N invocations.
+	 *   It does not add a shader-side `instanceIndex` bounds guard.
+	 * - An array [x, y, z] directly sets workgroup counts, launching
+	 *   x * y * z * product(workgroupSize) invocations.
+	 * - An IndirectStorageBufferAttribute supplies GPU-defined workgroup counts.
+	 * In contrast, node-level `compute(N, workgroupSize)` adds an `instanceIndex`
+	 * count guard when the shader backend supports early returns.
 	 * @return {Promise} A Promise that resolve when the compute has finished.
 	 */
 	async computeAsync( computeNodes, dispatchSize = null ) {

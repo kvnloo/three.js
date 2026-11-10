@@ -1905,16 +1905,12 @@ class WebGPUBackend extends Backend {
 	 * @param {Node} computeNode - The compute node.
 	 * @param {Array<BindGroup>} bindings - The bindings.
 	 * @param {ComputePipeline} pipeline - The compute pipeline.
-	 * @param {number|Array<number>|IndirectStorageBufferAttribute} [dispatchSize=null]
-	 * An argument that defines the number of compute invocations executed in a compute call
-	 * and the size of the dispatched workgroup grid in which they are executed.
-	 * Depending on the type of the argument, the dispatch size of a compute call will be determined in different ways.
-	 * - A number will dispatch a workgroup grid sized to fit `dispatchSize` invocations.
-	 * - An array [x, y, z] will directly define the size of the workgroup grid.
-	 *   The compute call will execute x * y * z * workgroupSize invocations.
-	 * - A IndirectStorageBufferAttribute will run an indirect compute dispatch.
-	 *   In an indirect dispatch, the [x, y, z] dimensions of the workgroup grid are defined by the first three values
-	 *   stored in the IndirectStorageBufferAttribute.
+	 * @param {number|Array<number>|IndirectStorageBufferAttribute} [dispatchSize=null] - Workgroup-grid sizing, not a shader-side count guard.
+	 * - A number N rounds up to whole workgroups and may launch more than N invocations.
+	 * - An array [x, y, z] launches x * y * z * product(workgroupSize) invocations.
+	 * - An IndirectStorageBufferAttribute supplies GPU-defined workgroup counts.
+	 * Only the node-level `compute(N, workgroupSize)` path adds an `instanceIndex`
+	 * count guard when early returns are supported.
 	 */
 	compute( computeGroup, computeNode, bindings, pipeline, dispatchSize = null ) {
 
