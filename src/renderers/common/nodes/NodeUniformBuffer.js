@@ -46,6 +46,31 @@ class NodeUniformBuffer extends UniformBuffer {
 		 */
 		this.isNodeUniformBuffer = true;
 
+		/**
+		 * The version of the uniform group node last used to update this binding.
+		 * See {@link NodeManager#updateGroup}.
+		 *
+		 * @type {number}
+		 * @default -1
+		 */
+		this.groupVersion = - 1;
+
+	}
+
+	/**
+	 * Clones this uniform buffer with an unset group version. A cloned binding
+	 * must update when used for the first time in another bind group.
+	 *
+	 * @return {NodeUniformBuffer} The cloned uniform buffer.
+	 */
+	clone() {
+
+		const clone = super.clone();
+
+		clone.groupVersion = - 1;
+
+		return clone;
+
 	}
 
 	/**
