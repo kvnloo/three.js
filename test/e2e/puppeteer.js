@@ -14,7 +14,6 @@ const exceptionList = [
  	'webgl_materials_cubemap_dynamic', 	// 1 min
 	'webgl_materials_displacementmap', 	// 1 min
 	'webgl_materials_envmaps_hdr', 		// 1 min
-	'webgpu_water', 					// 1 min
 	'webgpu_loader_vdb',				// streams 31 MB of frames
 
 	// Requires HTML-in-Canvas API
@@ -46,6 +45,7 @@ const exceptionList = [
 	'webgpu_storage_buffer',
 	'webgpu_tsl_editor',
 	'webgpu_tsl_graph',
+	'webgpu_tsl_noise_smoothing',
 	'webxr_vr_video',
 	'webgpu_tsl_transpiler',
 	'webgpu_rendertarget_2d-array_3d',
