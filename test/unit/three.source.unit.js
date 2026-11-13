@@ -235,6 +235,9 @@ import './src/renderers/WebGLRenderTarget.tests.js';
 //src/renderers/common
 import './src/renderers/common/ClippingContext.tests.js';
 
+//src/renderers/webgpu
+import './src/renderers/webgpu/WebGPUBackend.tests.js';
+
 //src/renderers/shaders
 import './src/renderers/shaders/ShaderChunk.tests.js';
 import './src/renderers/shaders/ShaderLib.tests.js';
