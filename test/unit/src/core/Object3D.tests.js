@@ -709,6 +709,57 @@ export default QUnit.module( 'Core', () => {
 
 		} );
 
+		QUnit.test( 'updateMatrixWorld (manual recompute)', ( assert ) => {
+
+			const object = new Object3D();
+			object.matrixAutoUpdate = false;
+			object.matrixWorldAutoUpdate = false;
+			object.matrix.makeTranslation( 3, 0, 0 );
+			object.matrixWorldNeedsUpdate = false;
+
+			object.updateMatrixWorld();
+
+			assert.strictEqual( object.matrixWorld.elements[ 12 ], 3,
+				'Direct world update copies the manually assigned local transform' );
+
+		} );
+
+		QUnit.test( 'updateMatrixWorld (no descendant traversal)', ( assert ) => {
+
+			const parent = new Object3D();
+			const child = new Object3D();
+			parent.add( child );
+			parent.position.x = 2;
+			child.position.x = 4;
+
+			parent.updateMatrix();
+			parent.updateMatrixWorld();
+
+			assert.strictEqual( parent.matrixWorld.elements[ 12 ], 2,
+				'Only the parent world matrix is explicitly recalculated' );
+			assert.strictEqual( child.matrixWorld.elements[ 12 ], 0,
+				'The untouched child world matrix remains the identity' );
+
+		} );
+
+		QUnit.test( 'updateWorldMatrix (third argument compatibility)', ( assert ) => {
+
+			const twoArguments = new Object3D();
+			twoArguments.position.x = 7;
+			twoArguments.updateWorldMatrix( false, false );
+
+			assert.strictEqual( twoArguments.matrixWorld.elements[ 12 ], 7,
+				'The two-argument form composes the local position' );
+
+			const threeArguments = new Object3D();
+			threeArguments.position.x = 7;
+			threeArguments.updateWorldMatrix( false, false, false );
+
+			assert.strictEqual( threeArguments.matrixWorld.elements[ 12 ], 7,
+				'Explicit force=false must not suppress local matrix composition' );
+
+		} );
+
 		QUnit.test( 'updateMatrixWorld', ( assert ) => {
 
 			const parent = new Object3D();
