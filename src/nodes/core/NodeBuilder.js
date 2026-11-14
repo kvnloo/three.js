@@ -29,12 +29,12 @@ import { Color } from '../../math/Color.js';
 import { Vector2 } from '../../math/Vector2.js';
 import { Vector3 } from '../../math/Vector3.js';
 import { Vector4 } from '../../math/Vector4.js';
-import { Float16BufferAttribute } from '../../core/BufferAttribute.js';
-import { warn, error, yieldToMain } from '../../utils.js';
+import { warn, error } from '../../utils.js';
 
 let _id = 0;
 
 const _functionNodeCache = new WeakMap();
+const _functionShaderNodes = new WeakMap();
 const _layoutDefaultsCache = new WeakMap();
 
 // Inputs of a layout function call. They can be destructured as an array or as an object.
@@ -282,11 +282,11 @@ class NodeBuilder {
 		this.updateAfterNodes = [];
 
 		/**
-		 * A dictionary that assigns each node to a unique hash.
+		 * A map that assigns each node to a unique hash.
 		 *
-		 * @type {Object<number,Node>}
+		 * @type {Map<number,Node>}
 		 */
-		this.hashNodes = {};
+		this.hashNodes = new Map();
 
 		/**
 		 * A reference to a node material observer.
@@ -856,7 +856,7 @@ class NodeBuilder {
 	 */
 	setHashNode( node, hash ) {
 
-		this.hashNodes[ hash ] = node;
+		this.hashNodes.set( hash, node );
 
 	}
 
@@ -1075,7 +1075,7 @@ class NodeBuilder {
 	 */
 	getNodeFromHash( hash ) {
 
-		return this.hashNodes[ hash ];
+		return this.hashNodes.get( hash );
 
 	}
 
@@ -1403,7 +1403,9 @@ class NodeBuilder {
 
 			for ( const shaderStage in nodeData ) {
 
-				if ( _checkWriteUsage( nodeData[ shaderStage ] ) ) {
+				const data = nodeData[ shaderStage ];
+
+				if ( data !== undefined && _checkWriteUsage( data ) ) {
 
 					return true;
 
@@ -1908,7 +1910,7 @@ class NodeBuilder {
 
 		let arrayType;
 
-		if ( ! ( attribute instanceof Float16BufferAttribute ) && normalized !== true ) {
+		if ( normalized !== true ) {
 
 			arrayType = this.getTypeFromArray( array );
 
@@ -2206,7 +2208,7 @@ class NodeBuilder {
 
 		if ( nodeData === undefined ) {
 
-			nodeData = {};
+			nodeData = { vertex: undefined, fragment: undefined, compute: undefined, any: undefined };
 
 			cache.setData( node, nodeData );
 
@@ -2758,16 +2760,20 @@ class NodeBuilder {
 	 */
 	buildFunctionNode( shaderNode ) {
 
+		// the code is shared by all builders of a backend, per shader stage since it can differ between stages
+
 		const backend = this.renderer.backend;
 
-		let cache = _functionNodeCache.get( backend );
+		let stages = _functionNodeCache.get( backend );
 
-		if ( cache === undefined ) {
+		if ( stages === undefined ) {
 
-			cache = new WeakMap();
-			_functionNodeCache.set( backend, cache );
+			stages = {};
+			_functionNodeCache.set( backend, stages );
 
 		}
+
+		const cache = stages[ this.shaderStage ] || ( stages[ this.shaderStage ] = new WeakMap() );
 
 		let fn = cache.get( shaderNode );
 
@@ -2784,10 +2790,26 @@ class NodeBuilder {
 			this.currentFunctionNode = previous;
 
 			cache.set( shaderNode, fn );
+			_functionShaderNodes.set( fn, shaderNode );
 
 		}
 
 		return fn;
+
+	}
+
+	/**
+	 * Returns the function node to call in the current shader stage. A call of a TSL function
+	 * can be set up in another stage, and the code of TSL functions is built per stage.
+	 *
+	 * @param {FunctionNode} functionNode - The function node of the call.
+	 * @return {FunctionNode} The function node of the current stage.
+	 */
+	getFunctionNode( functionNode ) {
+
+		const shaderNode = _functionShaderNodes.get( functionNode );
+
+		return shaderNode !== undefined ? this.buildFunctionNode( shaderNode ) : functionNode;
 
 	}
 
@@ -3687,70 +3709,6 @@ class NodeBuilder {
 					}
 
 				}
-
-			}
-
-		}
-
-		this.setBuildStage( null );
-		this.setShaderStage( null );
-
-		// stage 4: build code for a specific output
-
-		this.buildCode();
-		this.buildUpdateNodes();
-
-		return this;
-
-	}
-
-	/**
-	 * Async version of build() that yields to main thread between shader stages.
-	 * Use this in compileAsync() to prevent blocking the main thread.
-	 *
-	 * @param {Function} [yieldFn=yieldToMain] - The function used to yield to the main thread.
-	 * @return {Promise<NodeBuilder>} A promise that resolves to this node builder.
-	 */
-	async buildAsync( yieldFn = yieldToMain ) {
-
-		this.prebuild();
-
-		// setup() -> stage 1: create possible new nodes and/or return an output reference node
-		// analyze()   -> stage 2: analyze nodes to possible optimization and validation
-		// generate()  -> stage 3: generate shader
-
-		for ( const buildStage of defaultBuildStages ) {
-
-			this.setBuildStage( buildStage );
-
-			if ( this.context.position && this.context.position.isNode ) {
-
-				this.flowNodeFromShaderStage( 'vertex', this.context.position );
-
-			}
-
-			for ( const shaderStage of shaderStages ) {
-
-				this.setShaderStage( shaderStage );
-
-				const flowNodes = this.flowNodes[ shaderStage ];
-
-				for ( const node of flowNodes ) {
-
-					if ( buildStage === 'generate' ) {
-
-						this.flowNode( node );
-
-					} else {
-
-						node.build( this );
-
-					}
-
-				}
-
-				// Yield to main thread after each shader stage to prevent blocking
-				await yieldFn();
 
 			}
 

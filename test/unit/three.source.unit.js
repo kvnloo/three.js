@@ -56,6 +56,8 @@ import './src/core/InterleavedBufferAttribute.tests.js';
 import './src/core/Layers.tests.js';
 import './src/core/Object3D.tests.js';
 import './src/core/Raycaster.tests.js';
+import './src/core/RenderTarget.tests.js';
+import './src/core/RenderTarget3D.tests.js';
 import './src/core/Uniform.tests.js';
 import './src/core/UniformsGroup.tests.js';
 
@@ -268,6 +270,7 @@ import './src/textures/VideoTexture.tests.js';
 
 
 //src/nodes/display
+import './src/nodes/display/PassNode.tests.js';
 import './src/nodes/display/ViewportTextureNode.tests.js';
 import './src/nodes/display/ViewportDepthTextureNode.tests.js';
 

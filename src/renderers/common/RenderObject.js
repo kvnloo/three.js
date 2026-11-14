@@ -688,7 +688,7 @@ class RenderObject {
 
 		let instanceCount = 1;
 
-		if ( geometry.isInstancedBufferGeometry === true ) {
+		if ( geometry.isInstancedBufferGeometry === true && object.isInstancedMesh !== true ) {
 
 			instanceCount = geometry.instanceCount;
 
@@ -767,6 +767,7 @@ class RenderObject {
 			const attribute = geometry.attributes[ name ];
 
 			cacheKey += name + ',';
+			cacheKey += attribute.array.constructor.name + ',';
 
 			if ( attribute.itemSize ) cacheKey += attribute.itemSize + ',';
 			if ( attribute.normalized ) cacheKey += 'n,';
