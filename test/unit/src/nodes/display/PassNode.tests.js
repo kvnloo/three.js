@@ -25,6 +25,12 @@ export default QUnit.module( 'Nodes', () => {
 
 				assert.strictEqual( bytePass.renderTarget.texture.type, UnsignedByteType, 'Honors the type option.' );
 
+				const byteRenderer = { samples: 0, reversedDepthBuffer: false, getOutputBufferType: () => UnsignedByteType };
+				const halfFloatPass = pass( scene, camera, { type: HalfFloatType } );
+				halfFloatPass.setup( { renderer: byteRenderer } );
+
+				assert.strictEqual( halfFloatPass.renderTarget.texture.type, HalfFloatType, 'Honors the half-float type option with an unsigned-byte renderer.' );
+
 			} );
 
 		} );
