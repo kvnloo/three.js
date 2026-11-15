@@ -125,6 +125,102 @@ export default QUnit.module( 'Objects', () => {
 
 		} );
 
+		QUnit.test( 'copy refreshes a previously rendered empty target', ( assert ) => {
+
+			const material = new MeshBasicMaterial();
+			const camera = new PerspectiveCamera();
+			camera.updateMatrixWorld();
+
+			const source = new BatchedMesh( 4, 1000, 2000, material );
+			source.perObjectFrustumCulled = false;
+			source.sortObjects = false;
+			const geometryId = source.addGeometry( new BoxGeometry() );
+			source.addInstance( geometryId );
+			source.onBeforeRender( {}, null, camera, source.geometry, material );
+
+			const target = new BatchedMesh( 4, 1000, 2000, material );
+			target.perObjectFrustumCulled = false;
+			target.sortObjects = false;
+			target.onBeforeRender( {}, null, camera, target.geometry, material );
+			assert.strictEqual( target._multiDrawCount, 0, 'empty target has no draws' );
+			assert.strictEqual( target._visibilityChanged, false, 'empty target is initially clean' );
+
+			target.copy( source );
+			assert.strictEqual( target._visibilityChanged, true, 'copy invalidates clean target' );
+			assert.strictEqual( target._multiDrawCount, 1, 'copy retains one active draw' );
+
+			target.onBeforeRender( {}, null, camera, target.geometry, material );
+			assert.strictEqual( target._multiDrawCount, 1, 'first render retains one active draw' );
+			assert.strictEqual( target._multiDrawStarts[ 0 ], 0, 'indexed box starts at byte offset zero' );
+			assert.strictEqual( target._multiDrawCounts[ 0 ], 36, 'one box has 36 indices' );
+
+		} );
+
+		QUnit.test( 'copy preserves nonzero merged draw count', ( assert ) => {
+
+			const material = new MeshBasicMaterial();
+			const camera = new PerspectiveCamera();
+			camera.updateMatrixWorld();
+
+			const source = new BatchedMesh( 4, 1000, 2000, material );
+			source.perObjectFrustumCulled = false;
+			source.sortObjects = false;
+			const geometryId = source.addGeometry( new BoxGeometry() );
+			source.addInstance( geometryId );
+			source.addInstance( geometryId );
+			source._updateDrawParameters( camera, source.geometry, material, 'merged' );
+			assert.strictEqual( source._multiDrawCount, 2, 'two instances have two logical draws' );
+			assert.strictEqual( source._mergedDrawCount, 1, 'identical ranges merge into one draw' );
+
+			const target = new BatchedMesh( 4, 1000, 2000, material );
+			target.perObjectFrustumCulled = false;
+			target.sortObjects = false;
+			target._updateDrawParameters( camera, target.geometry, material, 'merged' );
+			assert.strictEqual( target._visibilityChanged, false, 'empty target starts clean' );
+
+			target.copy( source );
+			assert.strictEqual( target._visibilityChanged, true, 'copy marks merged draw state dirty' );
+			assert.strictEqual( target._multiDrawCount, 2, 'two logical draw counts copied' );
+			assert.strictEqual( target._mergedDrawCount, 1, 'nonzero merged draw count copied' );
+
+			target._updateDrawParameters( camera, target.geometry, material, 'merged' );
+			assert.strictEqual( target._multiDrawCount, 2, 'first update retains two logical draws' );
+			assert.strictEqual( target._mergedDrawCount, 1, 'first update retains one merged draw' );
+			assert.strictEqual( target._mergedDrawStarts[ 0 ], 0, 'merged draw begins at byte offset zero' );
+			assert.strictEqual( target._mergedDrawCounts[ 0 ], 36, 'merged range has 36 indices' );
+			assert.strictEqual( target._mergedDrawInstanceCounts[ 0 ], 2, 'both instances share merged range' );
+
+		} );
+
+		QUnit.test( 'copy applies the source custom sort', ( assert ) => {
+
+			const material = new MeshBasicMaterial();
+			const camera = new PerspectiveCamera();
+			camera.updateMatrixWorld();
+
+			const source = new BatchedMesh( 4, 1000, 2000, material );
+			source.perObjectFrustumCulled = false;
+			source.sortObjects = true;
+			const geometryId = source.addGeometry( new BoxGeometry() );
+			source.addInstance( geometryId );
+			source.addInstance( geometryId );
+
+			const reverseById = ( list ) => list.sort( ( a, b ) => b.index - a.index );
+			source.customSort = reverseById;
+
+			const target = new BatchedMesh( 4, 1000, 2000, material );
+			target.copy( source );
+			assert.strictEqual( target.customSort, reverseById, 'copy preserves sort callback identity' );
+
+			target.onBeforeRender( {}, null, camera, target.geometry, material );
+			assert.deepEqual(
+				Array.from( target._indirectTexture.image.data.slice( 0, 2 ) ),
+				[ 1, 0 ],
+				'first render uses descending instance order'
+			);
+
+		} );
+
 	} );
 
 } );
