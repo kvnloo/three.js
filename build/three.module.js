@@ -9933,31 +9933,28 @@ function WebGLState( gl, extensions ) {
 
 	function bindFramebuffer( target, framebuffer ) {
 
-		if ( currentBoundFramebuffers[ target ] !== framebuffer ) {
+		if ( target === gl.FRAMEBUFFER ) {
 
-			gl.bindFramebuffer( target, framebuffer );
+			// binding gl.FRAMEBUFFER updates both gl.READ_FRAMEBUFFER and gl.DRAW_FRAMEBUFFER
 
-			currentBoundFramebuffers[ target ] = framebuffer;
+			if ( currentBoundFramebuffers[ gl.DRAW_FRAMEBUFFER ] === framebuffer && currentBoundFramebuffers[ gl.READ_FRAMEBUFFER ] === framebuffer ) return false;
 
-			// gl.DRAW_FRAMEBUFFER is equivalent to gl.FRAMEBUFFER
+			gl.bindFramebuffer( gl.FRAMEBUFFER, framebuffer );
 
-			if ( target === gl.DRAW_FRAMEBUFFER ) {
-
-				currentBoundFramebuffers[ gl.FRAMEBUFFER ] = framebuffer;
-
-			}
-
-			if ( target === gl.FRAMEBUFFER ) {
-
-				currentBoundFramebuffers[ gl.DRAW_FRAMEBUFFER ] = framebuffer;
-
-			}
+			currentBoundFramebuffers[ gl.DRAW_FRAMEBUFFER ] = framebuffer;
+			currentBoundFramebuffers[ gl.READ_FRAMEBUFFER ] = framebuffer;
 
 			return true;
 
 		}
 
-		return false;
+		if ( currentBoundFramebuffers[ target ] === framebuffer ) return false;
+
+		gl.bindFramebuffer( target, framebuffer );
+
+		currentBoundFramebuffers[ target ] = framebuffer;
+
+		return true;
 
 	}
 
@@ -19168,6 +19165,8 @@ class WebGLRenderer {
 
 			textures.setTexture2D( texture, 0 );
 
+			state.activeTexture( _gl.TEXTURE0 ); // see #33153
+
 			_gl.copyTexSubImage2D( _gl.TEXTURE_2D, level, 0, 0, x, y, width, height );
 
 			state.unbindTexture();
@@ -19206,8 +19205,8 @@ class WebGLRenderer {
 			} else {
 
 				const levelScale = Math.pow( 2, - srcLevel );
-				width = Math.floor( image.width * levelScale );
-				height = Math.floor( image.height * levelScale );
+				width = Math.floor( srcTexture.width * levelScale );
+				height = Math.floor( srcTexture.height * levelScale );
 				if ( srcTexture.isDataArrayTexture ) {
 
 					depth = image.depth;
@@ -19377,7 +19376,7 @@ class WebGLRenderer {
 
 					} else if ( dstTexture.isCompressedArrayTexture ) {
 
-						_gl.compressedTexSubImage3D( glTarget, dstLevel, dstX, dstY, dstZ, width, height, depth, glFormat, image.data );
+						_gl.compressedTexSubImage3D( glTarget, dstLevel, dstX, dstY, dstZ, image.width, image.height, depth, glFormat, image.data );
 
 					} else {
 
