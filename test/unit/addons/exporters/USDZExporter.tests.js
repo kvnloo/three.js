@@ -243,23 +243,37 @@ export default QUnit.module( 'Addons', () => {
 
 			} );
 
-			QUnit.test( 'export perspective camera with zoom', async ( assert ) => {
+			const perspectiveZoomCases = [
+				{ zoom: 0.5, focalLength: '8.750000' },
+				{ zoom: 1, focalLength: '17.50000' },
+				{ zoom: 2, focalLength: '35.00000' }
+			];
 
-				const exporter = new USDZExporter();
-				const scene = new Scene();
+			for ( const { zoom, focalLength } of perspectiveZoomCases ) {
 
-				const camera = new PerspectiveCamera( 60, 1.5, 0.1, 100 );
-				camera.zoom = 2;
-				scene.add( camera );
+				QUnit.test( `export perspective camera at zoom ${zoom}`, async ( assert ) => {
 
-				const exportResult = await exporter.parseAsync( scene );
-				const unzipped = unzipSync( exportResult );
-				const usdaContent = strFromU8( unzipped[ 'model.usda' ] );
+					const exporter = new USDZExporter();
+					const scene = new Scene();
+					const camera = new PerspectiveCamera( 90, 1, 0.1, 100 );
 
-				const expectedFocalLength = ( camera.getFocalLength() * camera.zoom ).toPrecision( 7 );
-				assert.ok( usdaContent.includes( `float focalLength = ${expectedFocalLength}` ), 'focalLength honors camera.zoom' );
+					camera.zoom = zoom;
+					camera.updateProjectionMatrix();
+					scene.add( camera );
 
-			} );
+					const exportResult = await exporter.parseAsync( scene );
+					const unzipped = unzipSync( exportResult );
+					assert.ok( unzipped[ 'model.usda' ], 'USDZ contains model.usda' );
+
+					const usdaContent = strFromU8( unzipped[ 'model.usda' ] );
+					assert.ok(
+						usdaContent.includes( `float focalLength = ${focalLength}` ),
+						`zoom ${zoom} exports ${focalLength} mm focalLength`
+					);
+
+				} );
+
+			}
 
 		} );
 
