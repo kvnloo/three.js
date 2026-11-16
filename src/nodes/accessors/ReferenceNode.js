@@ -204,6 +204,9 @@ class ReferenceNode extends Node {
 		} else if ( uniformType === 'texture' ) {
 
 			node = texture( null );
+			// References represent property slots, not unique texture values.
+			// Keep their bindings distinct when two slots point to one texture.
+			node.mergeable = false;
 
 		} else if ( uniformType === 'cubeTexture' ) {
 
