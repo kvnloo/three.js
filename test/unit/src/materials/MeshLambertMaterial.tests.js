@@ -7,6 +7,8 @@ import { PlaneGeometry } from '../../../../src/geometries/PlaneGeometry.js';
 import { PerspectiveCamera } from '../../../../src/cameras/PerspectiveCamera.js';
 import { Scene } from '../../../../src/scenes/Scene.js';
 import { Texture } from '../../../../src/textures/Texture.js';
+import TextureNode from '../../../../src/nodes/accessors/TextureNode.js';
+import { materialReference } from '../../../../src/nodes/accessors/MaterialReferenceNode.js';
 import LightsNode from '../../../../src/nodes/lighting/LightsNode.js';
 import WebGPURenderer from '../../../../src/renderers/webgpu/WebGPURenderer.js';
 import RenderObject from '../../../../src/renderers/common/RenderObject.js';
@@ -54,6 +56,49 @@ export default QUnit.module( 'Materials', () => {
 			assert.ok(
 				object.isMeshLambertMaterial,
 				'MeshLambertMaterial.isMeshLambertMaterial should be true'
+			);
+
+		} );
+
+		// TEXTURE REFERENCE BINDING OWNERSHIP
+		QUnit.test( 'Texture reference slots retain independent bindings for aliased textures (#35389)', ( assert ) => {
+
+			const sharedTexture = new Texture();
+			const otherTexture = new Texture();
+			const material = new MeshLambertMaterial( {
+				map: sharedTexture,
+				emissiveMap: sharedTexture
+			} );
+
+			const mapReference = materialReference( 'map', 'texture', material );
+			const emissiveReference = materialReference( 'emissiveMap', 'texture', material );
+
+			mapReference.updateValue();
+			emissiveReference.updateValue();
+
+			assert.strictEqual( mapReference.node.value, sharedTexture, 'The map slot references the shared texture.' );
+			assert.strictEqual( emissiveReference.node.value, sharedTexture, 'The emissive slot references the shared texture.' );
+			assert.notStrictEqual(
+				mapReference.node.getUniformHash(), emissiveReference.node.getUniformHash(),
+				'Distinct material property slots retain distinct uniform hashes even when aliased.'
+			);
+
+			const mapHash = mapReference.node.getUniformHash();
+			const emissiveHash = emissiveReference.node.getUniformHash();
+
+			material.emissiveMap = otherTexture;
+			emissiveReference.updateValue();
+
+			assert.strictEqual( emissiveReference.node.value, otherTexture, 'The emissive slot follows its updated texture.' );
+			assert.strictEqual( mapReference.node.getUniformHash(), mapHash, 'The map slot hash stays stable.' );
+			assert.strictEqual( emissiveReference.node.getUniformHash(), emissiveHash, 'The emissive slot hash does not depend on texture identity.' );
+
+			const directMap = new TextureNode( sharedTexture );
+			const directEmissive = new TextureNode( sharedTexture );
+
+			assert.strictEqual(
+				directMap.getUniformHash(), directEmissive.getUniformHash(),
+				'Explicit mergeable texture nodes still share a uniform for the same texture.'
 			);
 
 		} );
