@@ -125,6 +125,118 @@ export default QUnit.module( 'Materials', () => {
 		} );
 
 
+
+		// WEBGPU / WEBGL FALLBACK TEXTURE-NODE BINDING MATRIX
+		// Texture slots must keep a structural shader layout regardless of whether
+		// their values reference the same Texture instance or two different ones.
+		for ( const { label, forceWebGL } of [
+			{ label: 'WebGPU', forceWebGL: false },
+			{ label: 'WebGL fallback', forceWebGL: true }
+		] ) {
+
+			for ( const aliasedFirst of [ true, false ] ) {
+
+				QUnit.test( `texture-node binding matrix (#35389): ${ label }, ${ aliasedFirst ? 'aliased first' : 'distinct first' }`, ( assert ) => {
+
+					const sharedTexture = new Texture();
+					const mapTexture = new Texture();
+					const emissiveTexture = new Texture();
+					const fixtureTextures = [ sharedTexture, mapTexture, emissiveTexture ];
+
+					const aliasedMaterial = new MeshLambertMaterial( {
+						map: sharedTexture,
+						emissiveMap: sharedTexture,
+						emissive: 0xffffff
+					} );
+					const distinctMaterial = new MeshLambertMaterial( {
+						map: mapTexture,
+						emissiveMap: emissiveTexture,
+						emissive: 0xffffff
+					} );
+
+					const renderer = new WebGPURenderer( { forceWebGL } );
+					const scene = new Scene();
+					const camera = new PerspectiveCamera();
+					const lightsNode = new LightsNode();
+					const renderContext = new RenderContext();
+					const geometry = new PlaneGeometry();
+
+					function createRenderObject( nodes, material ) {
+
+						return new RenderObject(
+							nodes, null, renderer, new Mesh( geometry, material ),
+							material, scene, camera, lightsNode, renderContext, null
+						);
+
+					}
+
+					function fixtureTextureBindingCount( state ) {
+
+						return state.bindings.flatMap( ( group ) => group.bindings ).filter( ( binding ) => (
+							binding.isSampledTexture === true && fixtureTextures.includes( binding.texture )
+						) ).length;
+
+					}
+
+					// Independent builders expose the expected shader and binding
+					// layout for each material, without a prior cache hit.
+					const isolatedAliasedState = createRenderObject(
+						new NodeManager( renderer, renderer.backend ), aliasedMaterial
+					).getNodeBuilderState();
+					const isolatedDistinctState = createRenderObject(
+						new NodeManager( renderer, renderer.backend ), distinctMaterial
+					).getNodeBuilderState();
+
+					assert.strictEqual(
+						isolatedAliasedState.fragmentShader, isolatedDistinctState.fragmentShader,
+						'The independently built shaders must be structurally identical.'
+					);
+					assert.strictEqual(
+						fixtureTextureBindingCount( isolatedAliasedState ), 2,
+						'Two material texture slots require two sampled-texture binding positions, even when aliased.'
+					);
+					assert.strictEqual(
+						fixtureTextureBindingCount( isolatedDistinctState ), 2,
+						'Two distinct texture slots require two sampled-texture binding positions.'
+					);
+
+					// A single NodeManager caches the first builder state for the
+					// second material, in both possible compilation orders.
+					const sharedNodes = new NodeManager( renderer, renderer.backend );
+					const firstMaterial = aliasedFirst ? aliasedMaterial : distinctMaterial;
+					const secondMaterial = aliasedFirst ? distinctMaterial : aliasedMaterial;
+					const firstRenderObject = createRenderObject( sharedNodes, firstMaterial );
+					const secondRenderObject = createRenderObject( sharedNodes, secondMaterial );
+
+					assert.strictEqual(
+						firstRenderObject.getMaterialCacheKey(), secondRenderObject.getMaterialCacheKey(),
+						'Material cache keys remain equal for structurally identical materials.'
+					);
+
+					const firstState = firstRenderObject.getNodeBuilderState();
+					const reusedState = secondRenderObject.getNodeBuilderState();
+					const isolatedSecondState = aliasedFirst ? isolatedDistinctState : isolatedAliasedState;
+
+					assert.strictEqual(
+						reusedState, firstState,
+						'The second material reuses the first material node builder state.'
+					);
+					assert.strictEqual(
+						reusedState.fragmentShader, isolatedSecondState.fragmentShader,
+						'The reused shader must agree with an independent compile of the second material.'
+					);
+					assert.strictEqual(
+						fixtureTextureBindingCount( reusedState ),
+						fixtureTextureBindingCount( isolatedSecondState ),
+						'The reused sampled-texture binding count must agree with the independent second material.'
+					);
+
+				} );
+
+			}
+
+		}
+
 	} );
 
 } );
